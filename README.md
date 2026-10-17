@@ -96,3 +96,7 @@ asdlc archive <ID>    # close the change
 ```
 
 See `openspec/config.yaml`, `.sdlc/policy.yaml`, and `AGENTS.md`.
+
+## Living Specifications
+
+- **`city-attractions-weather-recommendations`**: Travelers picking a Chinese city need to know which attractions are worth visiting *and* how the upcoming weather should change those plans. Today there is no tool that answers both at once; weather apps show forecasts but no attraction guidance, and attraction lists ignore the forecast. We build a website that takes a Chinese city name and returns per-day attraction recommendations shaped by the forecast, with English as the default system output.
