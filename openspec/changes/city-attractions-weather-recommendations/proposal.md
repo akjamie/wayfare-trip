@@ -5,12 +5,12 @@ Travelers picking a Chinese city need to know which attractions are worth visiti
 
 ## What Changes
 - **New website** (browser UI) backed by a Node.js (TypeScript) service; the recommendation logic is a pure, testable core module behind one JSON API. No CLI (the website is the product).
-- **Attraction retrieval via the Amap (高德) Web Service API** — `place/text` keyword search constrained to scenic POIs (`types=110000`, 风景名胜). An Amap Web Service key is required. Because Amap exposes no indoor/outdoor flag, each attraction's `environment ∈ {indoor,outdoor,mixed}` is derived from its `typecode` through a configurable mapping. Amap responses are cached per city (TTL) to respect the ~100 search calls/day personal quota.
+- **Attraction retrieval via the Amap (高德) Web Service API** — the resolved city's `adcode` is obtained via Amap reverse geocoding, then `place/text` is queried with `city=<adcode>&citylimit=true` constrained to scenic and museum-type POIs (`types=110000|140100|140200|140400|140600`). An Amap Web Service key is required. Because Amap exposes no indoor/outdoor flag, each attraction's `environment ∈ {indoor,outdoor,mixed}` is derived from its `typecode` through a configurable mapping. Amap responses are cached per city (TTL) to respect the ~100 search calls/day personal quota.
 - **Weather via Open-Meteo** (free, no API key): hourly/daily `temperature_2m`, `precipitation_probability`, and WMO `weather_code`, with `timezone=auto` for city-local time.
 - **Per-day recommendations** — `days[]`, one entry per forecast day (default 7), each carrying its weather summary, advice, and a ranked attraction list. Not a single merged ranking.
 - **Ranking rules**: rainy days rank indoor (and mixed) attractions ahead of outdoor; hot days flag outdoor (and mixed) attractions to avoid 11:00–15:00 local. Within a tier, Amap relevance order is preserved, tie-broken by POI id, capped at top-N (default 10/day).
-- **English default output** for all system/UI/advice/city text; Amap POI proper names are kept as `name_zh` (Chinese) with optional `name_en`, since Amap's English POI search is a paid multilingual service. Results are exposed as structured JSON plus an English summary.
-- **Explicit degraded-success vs validation-error semantics** (see spec): forecast-unavailable and no-attraction-data are 200 responses with notices; unresolved/ambiguous city and invalid input are 400.
+- **Explicit error taxonomy** (see spec): any upstream **API error** (weather or Amap) **blocks** the response with a user-friendly system-issue message and HTTP `503` (`forecast_unavailable` / `attraction_source_unavailable`); a successful Amap response with zero scenic results is a `200` `no_attraction_data` notice; unresolved/ambiguous city and invalid input are `400`.
+- **English default output** for all system/UI/advice/city text; Amap attractions expose their proper name as `name_zh` (Chinese), since Amap's English POI search is a paid multilingual service. Results are exposed as structured JSON plus an English summary.
 
 ## Capabilities
 - **New Capabilities**:

@@ -25,7 +25,7 @@
 
 ### Round 2 — CI spec-review resolutions
 
-- **B1 — Forecast-unavailable semantics** → **Degraded success**: HTTP 200 with a `forecast_unavailable` notice and indoor-first ranking. `no-forecast` is removed from the error taxonomy. (A true dependency outage would be 502/5xx; we deliberately choose degraded success.)
+- **B1 — Forecast-unavailable semantics** → *Superseded by Round 3*: upstream API errors now **block** with a friendly system-issue message (see Round 3 / NB1).
 
 - **B2 — No-attraction-data semantics** → **Degraded success**: HTTP 200 with a `no_attraction_data` notice and zero fabricated attractions. `no-attraction` is removed from the error taxonomy.
 
@@ -42,6 +42,16 @@
 - **M5 — Disambiguation** → Constrain to **country=CN**, pick the candidate with the **highest population**; expose the resolved English name and `admin1`.
 
 - **Minors (all applied)** → Enumerate default rain WMO codes (51–67, 80–82, 95–99) and treat snow (71–77, 85–86) as precipitation for indoor-first; document the 33°C rationale (conservative vs China MET's 35°C 高温预警 line); NFRs = p95 < 2s warm + 3s upstream timeout; input validation (empty/whitespace/overlong → 400); test runner = **vitest**; trailing newlines fixed; `explore.md` marked N/A (greenfield).
+
+### Round 3 — Amap surface-area review resolutions
+
+- **NB1 — Upstream API failure handling** → On **any upstream API error** (weather API *or* Amap attraction API), **block** the response and return a **user-friendly system-issue message** with HTTP `503` and a matching `error_code` (`forecast_unavailable` / `attraction_source_unavailable`); no partial/degraded recommendations. `start=0`/`infocode=10003` (quota), invalid/expired key, and timeouts are all treated as API errors. (Supersedes the Round-2 B1 degraded-success decision.)
+
+- **NB2 — POI type coverage** → Widen `types` to `110000|140100|140200|140400|140600` (scenic + museum + exhibition hall + art gallery + science museum) and extend the typecode→environment map (`1401xx`/`1402xx`/`1404xx`/`1406xx` → indoor; `1101xx`/`1102xx` → outdoor/mixed; unmapped → mixed).
+
+- **NB3 — City → Amap query bridge** → Keep **Open-Meteo** for city resolution (approved disambiguation + English/pinyin input), then obtain the city `adcode` via **Amap reverse geocoding** at the resolved coordinates and query `place/text` with `city=<adcode>&citylimit=true`. (Coords are the robust bridge; no name translation.)
+
+- **Minors** → `days` range pinned to **1–16**; overlong `city` (**>64 chars**) → `400`; **drop `name_en`** (keep `name_zh` only — no English-name source); scope AC18 determinism to **cached/mocked input**; mark `explore.md` **N/A**; regenerate the stale PR body.
 
 ## Open questions
 <!-- must be empty before the spec is written -->
