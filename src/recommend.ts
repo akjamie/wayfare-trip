@@ -76,15 +76,18 @@ export async function recommend(
   cfg: Config,
   fetchImpl: FetchLike = httpFetch,
   days?: number,
+  amap?: AmapClient,
 ): Promise<Recommendation> {
   const cityInput = validateCity(rawCity);
   const horizon = days ?? cfg.forecastDays;
 
   const city = await resolveCity(cityInput, fetchImpl, cfg.timeoutMs);
 
-  const amap = new AmapClient(fetchImpl, cfg.amapKey, cfg);
-  const adcode = await amap.adcodeFor(city.lat, city.lon);
-  const attractions = await amap.attractions(adcode);
+  // Reuse a long-lived client (with its TTL cache) when the caller provides one,
+  // so the per-city Amap cache survives across requests.
+  const client = amap ?? new AmapClient(fetchImpl, cfg.amapKey, cfg);
+  const adcode = await client.adcodeFor(city.lat, city.lon);
+  const attractions = await client.attractions(adcode);
 
   const forecast = await fetchForecast(
     city.lat,

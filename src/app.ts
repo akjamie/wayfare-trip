@@ -1,10 +1,11 @@
 import { createServer, type Server, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { dirname, join, normalize, extname } from "node:path";
+import { dirname, join, normalize, extname, relative, isAbsolute } from "node:path";
 import { loadConfig, type Config } from "./config.js";
 import { httpFetch, type FetchLike } from "./http.js";
 import { recommend, validateDays } from "./recommend.js";
+import { AmapClient } from "./amap.js";
 import { AppError } from "./errors.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -26,7 +27,8 @@ export function sendJson(res: ServerResponse, status: number, body: unknown): vo
 async function serveStatic(pathname: string, res: ServerResponse): Promise<void> {
   const rel = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
   const full = normalize(join(PUBLIC_DIR, rel));
-  if (!full.startsWith(PUBLIC_DIR)) {
+  const relToPublic = relative(PUBLIC_DIR, full);
+  if (relToPublic.startsWith("..") || isAbsolute(relToPublic)) {
     res.writeHead(403);
     res.end("Forbidden");
     return;
@@ -46,6 +48,8 @@ export function createApp(
   cfg: Config = loadConfig(),
   fetchImpl: FetchLike = httpFetch,
 ): Server {
+  // One long-lived Amap client so its per-city TTL cache is shared across requests.
+  const amap = new AmapClient(fetchImpl, cfg.amapKey, cfg);
   return createServer((req, res) => {
     void (async () => {
       try {
@@ -53,7 +57,7 @@ export function createApp(
         if (url.pathname === "/api/recommend") {
           const days = validateDays(url.searchParams.get("days"), cfg);
           const city = url.searchParams.get("city") ?? "";
-          sendJson(res, 200, await recommend(city, cfg, fetchImpl, days));
+          sendJson(res, 200, await recommend(city, cfg, fetchImpl, days, amap));
           return;
         }
         await serveStatic(url.pathname, res);

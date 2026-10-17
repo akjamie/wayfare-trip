@@ -74,4 +74,13 @@ describe("advice rules", () => {
     expect(isRainyDay(day({ precip: 60 }), cfg)).toBe(true);
     expect(isRainyDay(day({ precip: 60 }), { ...cfg, rainProbThreshold: 90 })).toBe(false);
   });
+
+  it("AC17b: an overridden noon window changes the advisory text", () => {
+    const ranked = rankForDay(
+      [att("o", "outdoor")],
+      { rain: false, hot: true },
+      { ...cfg, noonStart: 12, noonEnd: 14 },
+    );
+    expect(ranked[0].advisories.join(" ")).toContain("12:00-14:00");
+  });
 });

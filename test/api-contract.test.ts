@@ -2,13 +2,16 @@ import { describe, it, expect, afterEach } from "vitest";
 import type { Server } from "node:http";
 import { createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
-import { makeFetch, happyRoutes, type Route } from "./helpers.js";
+import { makeFetch, happyRoutes, type Route, type MockFetch } from "./helpers.js";
 
 const cfg = { ...loadConfig({} as Record<string, string>, {}), amapKey: "testkey" };
 
 let server: Server | undefined;
+let mock: MockFetch | undefined;
+
 async function start(routes: Route[] = happyRoutes()): Promise<string> {
-  server = createApp(cfg, makeFetch(routes));
+  mock = makeFetch(routes);
+  server = createApp(cfg, mock);
   await new Promise<void>((res) => server!.listen(0, res));
   const addr = server!.address();
   const port = typeof addr === "object" && addr ? addr.port : 0;
@@ -18,6 +21,7 @@ async function start(routes: Route[] = happyRoutes()): Promise<string> {
 afterEach(async () => {
   if (server) await new Promise<void>((r) => server!.close(() => r()));
   server = undefined;
+  mock = undefined;
 });
 
 describe("http contract", () => {
@@ -50,6 +54,7 @@ describe("http contract", () => {
         expect(["indoor", "outdoor", "mixed"]).toContain(a.environment);
         expect(typeof a.name_zh).toBe("string");
         expect(typeof a.id).toBe("string");
+        expect(String(a.location)).toContain(",");
         expect(Array.isArray(a.advisories)).toBe(true);
       }
     }
@@ -73,5 +78,13 @@ describe("http contract", () => {
       expect(typeof body.message).toBe("string");
       expect(body.message.length).toBeGreaterThan(0);
     }
+  });
+
+  it("AC8 (production path): repeated requests reuse the per-city Amap cache", async () => {
+    const base = await start();
+    await fetch(`${base}/api/recommend?city=Beijing&days=7`);
+    await fetch(`${base}/api/recommend?city=Beijing&days=7`);
+    expect(mock!.count("place/text")).toBe(1);
+    expect(mock!.count("geocode/regeo")).toBe(1);
   });
 });

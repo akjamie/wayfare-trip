@@ -7,7 +7,7 @@
 - [x] 1.1 [IMPL] Initialize the Node/TypeScript project (package.json, tsconfig, vitest config, `src/`, `test/`) so tests can run. (harness for AC1–AC27)
   - evidence: `npm test` executes and reports the empty suite.
 - [x] 1.2 [IMPL] Add `.env` loading (`AMAP_KEY`) and a config module with defaults `WAYFARE_RAIN_PROB=50`, `WAYFARE_HIGH_TEMP_C=33`, `WAYFARE_NOON_START=11:00`, `WAYFARE_NOON_END=15:00`, `WAYFARE_FORECAST_DAYS=7`, `WAYFARE_TOP_N=10`. (supports AC13, AC16, AC17, AC19)
-  - evidence: config module unit test returns the defaults and honors env overrides.
+  - evidence: `npx vitest run test/config.test.ts` -> PASS — defaults, env overrides, `HH:mm` parsing, `AMAP_API_KEY` alias.
 
 ## 2. City resolution & disambiguation
 - [x] 2.1 [TEST] Write failing tests for city resolution/disambiguation. (AC1)
@@ -35,7 +35,8 @@
 - [x] 3.5 [TEST] Add a cache test: a second request within the TTL issues no second Amap call. (AC8)
   - verify: `npx vitest run test/amap-client.test.ts` fails — mock counts Amap calls.
 - [x] 3.6 [IMPL] Implement the per-city TTL cache (concurrency-safe). (AC8)
-  - evidence: AC8 passes with call-count == 1.
+  - evidence: `test/amap-client.test.ts` AC8 call-count == 1 for two calls on one client.
+  - evidence: `test/api-contract.test.ts` AC8 production path — two HTTP requests reuse the cache (regeo + place/text each called once); a single long-lived `AmapClient` is created in `createApp`.
 
 ## 4. Weather fetch & per-day recommendation
 - [x] 4.1 [TEST] Write failing tests for per-day assembly. (AC9)
@@ -81,7 +82,7 @@
 - [x] 7.2 [IMPL] Implement the English output formatter (no `name_en`). (AC20, AC21)
   - evidence: AC20 + AC21 pass.
 - [x] 7.3 [IMPL] Add a minimal responsive website page that calls the JSON API. (AC20)
-  - evidence: web smoke test loads the page and asserts it calls `GET /api/recommend`.
+  - evidence: `npx vitest run test/web-smoke.test.ts` -> PASS — serves `/` (doctype, form, `/app.js`) and `/app.js` (calls `/api/recommend`); non-public paths 404.
 
 ## 8. HTTP contract & input validation
 - [x] 8.1 [TEST] Write failing contract tests for `GET /api/recommend`. (AC22)
@@ -109,7 +110,8 @@
 
 ## 10. Converge & verify
 - [x] 10.1 [IMPL] Run the full suite and confirm every AC is covered. (AC1–AC27)
-  - evidence: `npm test` -> PASS — Test Files 8 passed (8), Tests 30 passed (30), Duration 661ms.
-  - evidence: `npx tsc --noEmit` -> PASS (no type errors).
+  - evidence: `npm test` -> PASS — Test Files 10 passed (10), Tests 39 passed (39).
+  - evidence: `npx tsc --noEmit` -> PASS (exit 0).
+  - evidence: live smoke (`npx tsx`, real Amap + Open-Meteo, Beijing) -> rain day ranks indoor-first; dry days unchanged.
 - [x] 10.2 [IMPL] Run `asdlc verify city-attractions-weather-recommendations` and fix any failing gate.
   - evidence: verify output with all gates passing.

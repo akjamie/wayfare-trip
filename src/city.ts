@@ -1,5 +1,6 @@
 import { getJson, type FetchLike } from "./http.js";
 import { AppError } from "./errors.js";
+import { logUpstreamError } from "./log.js";
 import type { ResolvedCity } from "./types.js";
 
 interface GeoResult {
@@ -28,7 +29,8 @@ export async function resolveCity(
   let data: { results?: GeoResult[] };
   try {
     data = await getJson(fetchImpl, url, timeoutMs);
-  } catch {
+  } catch (err) {
+    logUpstreamError("unknown_city", err);
     throw AppError.unknownCity();
   }
 

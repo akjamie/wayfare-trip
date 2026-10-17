@@ -1,5 +1,6 @@
 import { getJson, type FetchLike } from "./http.js";
 import { AppError } from "./errors.js";
+import { logUpstreamError } from "./log.js";
 import type { ForecastDay } from "./types.js";
 
 /**
@@ -22,12 +23,16 @@ export async function fetchForecast(
   let data: any;
   try {
     data = await getJson(fetchImpl, url, timeoutMs);
-  } catch {
+  } catch (err) {
+    logUpstreamError("forecast_unavailable", err);
     throw AppError.forecastUnavailable();
   }
 
   const daily = data?.daily;
-  if (!daily?.time?.length) throw AppError.forecastUnavailable();
+  if (!daily?.time?.length) {
+    logUpstreamError("forecast_unavailable", "empty daily payload");
+    throw AppError.forecastUnavailable();
+  }
 
   return daily.time.map((date: string, i: number): ForecastDay => ({
     date,

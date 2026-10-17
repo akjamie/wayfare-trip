@@ -1,5 +1,6 @@
 import { getJson, type FetchLike } from "./http.js";
 import { AppError } from "./errors.js";
+import { logUpstreamError } from "./log.js";
 import type { Attraction, Environment } from "./types.js";
 import type { Config } from "./config.js";
 
@@ -67,6 +68,7 @@ function toAttraction(poi: any, rank: number): Attraction {
 export class AmapClient {
   private readonly cache = new Map<string, { value: Attraction[]; expires: number }>();
   private readonly inflight = new Map<string, Promise<Attraction[]>>();
+  private readonly adcodeCache = new Map<string, { value: string; expires: number }>();
 
   constructor(
     private readonly fetchImpl: FetchLike,
@@ -74,21 +76,29 @@ export class AmapClient {
     private readonly cfg: Config,
   ) {}
 
-  /** City-level adcode from coordinates via Amap reverse geocoding. */
+  /** City-level adcode from coordinates via Amap reverse geocoding (cached by coords). */
   async adcodeFor(lat: number, lon: number): Promise<string> {
+    const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+    const cached = this.adcodeCache.get(key);
+    if (cached && cached.expires > Date.now()) return cached.value;
+
     const url =
       "https://restapi.amap.com/v3/geocode/regeo" +
       `?location=${encodeURIComponent(`${lon},${lat}`)}&key=${encodeURIComponent(this.key)}`;
     let data: any;
     try {
       data = await getJson(this.fetchImpl, url, this.cfg.timeoutMs);
-    } catch {
+    } catch (err) {
+      logUpstreamError("attraction_source_unavailable", err);
       throw AppError.attractionSourceUnavailable();
     }
     if (data?.status !== "1") throw AppError.attractionSourceUnavailable();
     const adcode = data?.regeocode?.addressComponent?.adcode;
     if (!adcode) throw AppError.attractionSourceUnavailable();
-    return String(adcode);
+
+    const value = String(adcode);
+    this.adcodeCache.set(key, { value, expires: Date.now() + this.cfg.cacheTtlMs });
+    return value;
   }
 
   /** Scenic/museum attractions for a city, cached by adcode with a TTL. */
@@ -117,11 +127,15 @@ export class AmapClient {
     let data: any;
     try {
       data = await getJson(this.fetchImpl, url, this.cfg.timeoutMs);
-    } catch {
+    } catch (err) {
+      logUpstreamError("attraction_source_unavailable", err);
       throw AppError.attractionSourceUnavailable();
     }
     // status "0" covers quota exhaustion (infocode 10003), invalid key, etc.
-    if (data?.status !== "1") throw AppError.attractionSourceUnavailable();
+    if (data?.status !== "1") {
+      logUpstreamError("attraction_source_unavailable", `amap status=${data?.status} infocode=${data?.infocode}`);
+      throw AppError.attractionSourceUnavailable();
+    }
 
     const pois = Array.isArray(data.pois) ? data.pois : [];
     const attractions = pois

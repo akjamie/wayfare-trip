@@ -71,10 +71,16 @@ overrides `WAYFARE_RAIN_PROB`, `WAYFARE_HIGH_TEMP_C`, `WAYFARE_NOON_START`,
 }
 ```
 
-Errors use `{ "error_code": "...", "message": "..." }`:
-`400 invalid_input`, `400 unknown_city`. Degraded-but-successful responses return
-`200` with a notice (`forecast_unavailable`, `no_attraction_data`,
-`attraction_source_unavailable`).
+Errors use `{ "error_code": "...", "message": "..." }` with the mapped status:
+
+- `400 invalid_input` — bad `city`/`days` input
+- `400 unknown_city` — city not found (resolution is constrained to China)
+- `503 forecast_unavailable` — the weather API failed (blocked, friendly message)
+- `503 attraction_source_unavailable` — the Amap API failed, including quota
+  exhaustion (`infocode=10003`) and timeouts (blocked, friendly message)
+
+A well-formed Amap response with **no** scenic/museum results is a success:
+`200` with a `no_attraction_data` notice and empty attraction lists.
 
 ## Project governance
 

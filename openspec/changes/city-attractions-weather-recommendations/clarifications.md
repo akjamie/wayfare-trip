@@ -53,6 +53,19 @@
 
 - **Minors** → `days` range pinned to **1–16**; overlong `city` (**>64 chars**) → `400`; **drop `name_en`** (keep `name_zh` only — no English-name source); scope AC18 determinism to **cached/mocked input**; mark `explore.md` **N/A**; regenerate the stale PR body.
 
+## Scope note (implementation PR)
+
+- The implementation PR also carries repo **bootstrap/governance** files (`.sdlc/`,
+  `.opencode/`, `.antigravity/`, `AGENTS.md`, `openspec/config.yaml`,
+  `openspec/specs/`, refreshed `.agents/skills/**`). This is **intentional here**
+  (the `main` branch was missing them and this is the repo's first real change),
+  not a separate bootstrap PR. Runtime impact: none — they are tooling/agent
+  scaffolding, not application code. Recorded per the implementation review's
+  scope-creep finding.
+- **Deferred (recorded):** the `p95 < 2000 ms` warm-cache NFR has no automated
+  benchmark/perf test; covered only by the manual live smoke (~2.2 s cold). Left
+  as a known gap for a follow-up.
+
 ## Open questions
 <!-- must be empty before the spec is written -->
 (none)
