@@ -1,3 +1,6 @@
 schema: agentic-repo-change
 created: 2026-10-16
 requirement: "用户输入一个中国城市名,系统返回该城市的景点推荐,并结合未来几天的天气给出建议:下雨时优先室内景点,高温时避开中午的户外景点. 整个系统用英文作为默认输出"
+targetBranch: "main"
+lastPrType: "spec"
+prUrl: "https://github.com/akjamie/wayfare-trip/pull/2"
