@@ -74,7 +74,7 @@ export function loadConfig(
 ): Config {
   const get = (key: string): string | undefined => env[key] ?? fileEnv[key];
   return {
-    amapKey: get("AMAP_KEY") ?? DEFAULTS.amapKey,
+    amapKey: get("AMAP_KEY") ?? get("AMAP_API_KEY") ?? DEFAULTS.amapKey,
     amapTypes: get("WAYFARE_AMAP_TYPES") ?? DEFAULTS.amapTypes,
     rainProbThreshold: num(get("WAYFARE_RAIN_PROB"), DEFAULTS.rainProbThreshold),
     highTempC: num(get("WAYFARE_HIGH_TEMP_C"), DEFAULTS.highTempC),
