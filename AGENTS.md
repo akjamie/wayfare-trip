@@ -26,6 +26,16 @@ Need orientation? `asdlc status <ID>` (where am I / next command) and `asdlc doc
 ## System status (from the knowledge graph, generated - do not hand-edit)
 
 God nodes (most connected):
+  1. createApp() - 14 edges
+  2. loadConfig() - 14 edges
+  3. compilerOptions - 13 edges
+  4. recommend() - 12 edges
+  5. vitest - 12 edges
+  6. AmapClient - 11 edges
+  7. AppError - 11 edges
+  8. makeFetch() - 11 edges
+  9. Tasks - 11 edges
+  10. ADDED Requirements - 10 edges
 
 _Architectural hubs = the most-connected modules. Run `asdlc new <change>`
 to query the graph for detail._
