@@ -4,3 +4,5 @@ requirement: "用户输入一个中国城市名,系统返回该城市的景点�
 targetBranch: "main"
 lastPrType: "spec"
 prUrl: "https://github.com/akjamie/wayfare-trip/pull/2"
+specSha: 68457dead615eef7a614a91d9b4b809387ae9e24
+status: ready_for_impl
