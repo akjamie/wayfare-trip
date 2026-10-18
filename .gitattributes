@@ -1,0 +1,10 @@
+# Normalize line endings to LF so cross-OS tooling is deterministic
+# (the asdlc spec lint regexes are line-anchored and break on CRLF).
+*.md   text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.json text eol=lf
+*.ts   text eol=lf
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.cjs  text eol=lf
