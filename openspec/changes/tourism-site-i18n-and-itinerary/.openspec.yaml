@@ -1,0 +1,6 @@
+schema: agentic-repo-change
+created: 2026-10-18
+requirement: "基于现有 '城市景点+天气推荐' 功能改版: (1) 重做网页 UI,做成旅游网站风格,美观有吸引力; (2) 城市输入支持中文和拼音,并修正错误解析(例如 Xian 被解析成珠海、西安解析失败); (3) 网页支持中英文切换 (English/中文); (4) 输入城市后输出包含: 未来几天天气预报、景点推荐列表、每个景点的推荐理由、景点介绍、以及出游计划/行程安排"
+targetBranch: "main"
+lastPrType: "spec"
+prUrl: "https://github.com/akjamie/wayfare-trip/pull/4"
