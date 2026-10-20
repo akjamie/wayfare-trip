@@ -53,11 +53,21 @@ function toAttraction(poi: any, rank: number): Attraction {
   const loc = String(poi?.location ?? "");
   const [lngStr, latStr] = loc.split(",");
   const typecode = String(poi?.typecode ?? "");
+  const photos = Array.isArray(poi?.photos) ? poi.photos : [];
+  const photoUrl = photos
+    .map((p: any) => String(p?.url ?? ""))
+    .find((u: string) => u.startsWith("https://"));
+  const ratingRaw = poi?.biz_ext?.rating;
+  const rating = ratingRaw !== undefined && ratingRaw !== "" ? Number(ratingRaw) : undefined;
   return {
     id: String(poi?.id ?? ""),
     nameZh: String(poi?.name ?? ""),
     environment: environmentForTypecode(typecode),
     typecode,
+    category: poi?.type ? String(poi.type) : undefined,
+    rating: Number.isFinite(rating) ? rating : undefined,
+    photo: photoUrl ?? null,
+    address: poi?.address ? String(poi.address) : undefined,
     location: loc,
     lat: Number(latStr) || 0,
     lon: Number(lngStr) || 0,

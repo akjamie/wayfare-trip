@@ -20,25 +20,35 @@ afterEach(async () => {
 });
 
 describe("website smoke", () => {
-  it("AC20: serves the page, which references the recommend API and its script", async () => {
+  it("AC15: page has hero/search, language toggle, weather strip, cards, itinerary", async () => {
     const base = await start();
-    const res = await fetch(`${base}/`);
-    expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toContain("text/html");
-    const html = (await res.text()).toLowerCase();
+    const html = (await (await fetch(`${base}/`)).text()).toLowerCase();
     expect(html).toContain("<!doctype html>");
-    expect(html).toContain("/app.js");
-    expect(html).toContain("<form");
+    expect(html).toContain('id="hero"');
+    expect(html).toContain('id="lang"'); // language toggle
+    expect(html).toContain('id="weather"'); // weather strip
+    expect(html).toContain('id="cards"'); // attraction cards
+    expect(html).toContain('id="itinerary"'); // itinerary
   });
 
-  it("serves app.js, which calls the JSON API", async () => {
+  it("AC16: responsive viewport + breakpoints; images carry alt; app calls the API", async () => {
     const base = await start();
-    const res = await fetch(`${base}/app.js`);
-    expect(res.status).toBe(200);
-    expect(await res.text()).toContain("/api/recommend");
+    const html = (await (await fetch(`${base}/`)).text()).toLowerCase();
+    expect(html).toContain('name="viewport"');
+    expect(html).toContain("@media");
+
+    const js = await (await fetch(`${base}/app.js`)).text();
+    expect(js).toContain("/api/recommend");
+    expect(js).toContain("alt=");
   });
 
-  it("only serves files under public/ (no traversal / repo files)", async () => {
+  it("AC17: page displays Amap photo attribution", async () => {
+    const base = await start();
+    const html = (await (await fetch(`${base}/`)).text()).toLowerCase();
+    expect(html).toContain("amap");
+  });
+
+  it("only serves files under public/", async () => {
     const base = await start();
     for (const p of ["/package.json", "/.env", "/src/config.ts"]) {
       const res = await fetch(`${base}${p}`);

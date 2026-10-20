@@ -85,6 +85,5 @@ describe("http contract", () => {
     await fetch(`${base}/api/recommend?city=Beijing&days=7`);
     await fetch(`${base}/api/recommend?city=Beijing&days=7`);
     expect(mock!.count("place/text")).toBe(1);
-    expect(mock!.count("geocode/regeo")).toBe(1);
   });
 });

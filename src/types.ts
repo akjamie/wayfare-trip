@@ -1,19 +1,28 @@
+import type { Lang } from "./i18n.js";
+
 export type Environment = "indoor" | "outdoor" | "mixed";
 
 export interface ResolvedCity {
   name: string;
+  nameZh: string;
   admin1: string;
   country: string;
   lat: number;
   lon: number;
+  adcode: string;
   population?: number;
 }
 
 export interface Attraction {
   id: string;
   nameZh: string;
+  nameEn?: string;
   environment: Environment;
   typecode: string;
+  category?: string;
+  rating?: number;
+  photo?: string | null;
+  address?: string;
   location: string;
   lat: number;
   lon: number;
@@ -42,6 +51,17 @@ export interface RankedAttraction {
   environment: Environment;
   location: string;
   advisories: string[];
+  reason: string;
+  introduction: string;
+  image: string | null;
+}
+
+export interface ItineraryStop {
+  slot: string;
+  label: string;
+  id: string;
+  name_zh: string;
+  environment: Environment;
 }
 
 export interface DayRecommendation {
@@ -49,10 +69,12 @@ export interface DayRecommendation {
   weather: DayWeather;
   advice: string;
   attractions: RankedAttraction[];
+  itinerary: ItineraryStop[];
 }
 
 export interface Recommendation {
-  city: { name: string; admin1: string; lat: number; lon: number };
+  lang: Lang;
+  city: { name: string; name_zh: string; admin1: string; lat: number; lon: number };
   days: DayRecommendation[];
   summary: string;
   notices: string[];

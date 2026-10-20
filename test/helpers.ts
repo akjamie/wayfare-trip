@@ -36,6 +36,7 @@ export function makeFetch(
 }
 
 export const GEO = "geocoding-api.open-meteo.com";
+export const AMAP_GEOCODE = "geocode/geo";
 export const AMAP_REGEO = "geocode/regeo";
 export const AMAP_TEXT = "place/text";
 export const WEATHER = "api.open-meteo.com/v1/forecast";
@@ -59,9 +60,31 @@ export const poisBody = {
   status: "1",
   count: "3",
   pois: [
-    { id: "B0MUSEUM", name: "故宫博物院", typecode: "140100", location: "116.397,39.918" },
-    { id: "B0PARK", name: "颐和园", typecode: "110100", location: "116.275,39.999" },
-    { id: "B0TEMPLE", name: "雍和宫", typecode: "110205", location: "116.417,39.947" },
+    {
+      id: "B0MUSEUM",
+      name: "故宫博物院",
+      typecode: "140100",
+      type: "科教文化服务;博物馆;博物馆",
+      location: "116.397,39.918",
+      address: "北京市东城区景山前街4号",
+      biz_ext: { rating: "4.8" },
+      photos: [{ url: "https://store.is.autonavi.com/museum.jpg" }],
+    },
+    {
+      id: "B0PARK",
+      name: "颐和园",
+      typecode: "110100",
+      type: "风景名胜;公园广场;公园广场",
+      location: "116.275,39.999",
+      address: "北京市海淀区",
+    },
+    {
+      id: "B0TEMPLE",
+      name: "雍和宫",
+      typecode: "110205",
+      type: "风景名胜;风景名胜;寺庙道观",
+      location: "116.417,39.947",
+    },
   ],
 };
 

@@ -5,37 +5,121 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>wayfare-trip — weather-aware attraction recommendations</title>
     <style>
-      :root { color-scheme: light dark; }
+      :root {
+        --bg: #0f172a;
+        --ink: #0b1220;
+        --muted: #5b6b82;
+        --card: #ffffff;
+        --accent: #0ea5a4;
+        --accent-2: #f59e0b;
+        --line: #e5e9f0;
+        --radius: 18px;
+        color-scheme: light;
+      }
       * { box-sizing: border-box; }
-      body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; line-height: 1.5; }
-      main { max-width: 760px; margin: 0 auto; padding: 2rem 1rem 4rem; }
-      h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
-      p.sub { margin: 0 0 1.5rem; opacity: 0.7; }
-      form { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-      input, button { font: inherit; padding: 0.6rem 0.75rem; border-radius: 8px; border: 1px solid #8888; }
-      input { flex: 1 1 220px; }
-      button { cursor: pointer; }
-      .day { border: 1px solid #8884; border-radius: 12px; padding: 1rem; margin-top: 1rem; }
-      .day h2 { font-size: 1rem; margin: 0 0 0.25rem; }
-      .advice { opacity: 0.85; margin: 0 0 0.75rem; }
-      ul { margin: 0; padding-left: 1.1rem; }
-      .env { font-size: 0.8rem; opacity: 0.7; }
-      .notice { background: #ffb00022; border: 1px solid #ffb00066; border-radius: 8px; padding: 0.5rem 0.75rem; margin-top: 1rem; }
-      .error { color: #c0392b; margin-top: 1rem; }
-      .zag { color: #2c7a4b; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, -apple-system, Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--ink);
+        background: #f6f8fb;
+        line-height: 1.55;
+      }
+      .hero {
+        position: relative;
+        padding: 4.5rem 1rem 3.5rem;
+        background:
+          radial-gradient(1200px 400px at 20% -10%, #0ea5a455, transparent),
+          radial-gradient(900px 400px at 100% 0%, #f59e0b44, transparent),
+          linear-gradient(160deg, #0f172a, #12233d 60%, #0b1220);
+        color: #fff;
+        text-align: center;
+      }
+      .hero h1 { font-size: clamp(1.6rem, 4vw, 2.6rem); margin: 0 0 0.4rem; letter-spacing: -0.02em; }
+      .hero p { margin: 0 auto 1.6rem; max-width: 42rem; color: #c8d3e2; }
+      .search {
+        display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center;
+        max-width: 720px; margin: 0 auto;
+      }
+      .search input, .search select, .search button {
+        font: inherit; padding: 0.75rem 0.9rem; border-radius: 12px; border: 1px solid #ffffff22;
+      }
+      .search input { flex: 1 1 240px; min-width: 0; background: #ffffff; color: var(--ink); }
+      .search input[type="number"] { flex: 0 0 6rem; }
+      .search select { background: #ffffff; color: var(--ink); }
+      .search button {
+        background: linear-gradient(135deg, var(--accent), #22c55e);
+        color: #05221f; font-weight: 700; cursor: pointer; border: none;
+      }
+      main { max-width: 1080px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+      .weather-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin: 1rem 0 1.5rem; }
+      .weather {
+        background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+        padding: 0.9rem 1rem; box-shadow: 0 8px 24px #0f172a0d;
+      }
+      .weather h3 { margin: 0 0 0.2rem; font-size: 0.9rem; color: var(--muted); font-weight: 600; }
+      .weather .temp { font-size: 1.25rem; font-weight: 700; }
+      .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+      .card {
+        background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+        overflow: hidden; box-shadow: 0 10px 30px #0f172a0f; display: flex; flex-direction: column;
+      }
+      .card img { width: 100%; height: 150px; object-fit: cover; background: #dbe3ee; display: block; }
+      .card .body { padding: 0.9rem 1rem 1.1rem; }
+      .card h3 { margin: 0 0 0.25rem; font-size: 1.05rem; }
+      .card .reason { color: var(--accent); font-weight: 600; font-size: 0.9rem; margin: 0 0 0.4rem; }
+      .card .intro { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.5rem; }
+      .tag { display: inline-block; font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: #eef6f6; color: #0b6b6a; }
+      .itinerary { margin-top: 1.6rem; }
+      .day-panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.1rem; margin-bottom: 1rem; }
+      .day-panel h3 { margin: 0 0 0.3rem; }
+      .day-panel .advice { color: var(--muted); margin: 0 0 0.6rem; }
+      .slots { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
+      .slots li { display: flex; gap: 0.6rem; align-items: baseline; }
+      .slots .slot { min-width: 5.5rem; color: var(--accent); font-weight: 700; font-size: 0.85rem; }
+      .notice { background: #fff7e6; border: 1px solid #f59e0b55; border-radius: 12px; padding: 0.6rem 0.8rem; margin: 0 0 1rem; }
+      .error { color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 0.7rem 0.9rem; }
+      .attribution { color: var(--muted); font-size: 0.78rem; text-align: center; margin-top: 2.5rem; }
+      .summary { color: var(--muted); margin: 0.2rem 0 0.6rem; }
+      .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+      @media (max-width: 768px) {
+        .hero { padding: 3rem 1rem 2.5rem; }
+        .cards { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+      }
+      @media (max-width: 420px) {
+        .search { flex-direction: column; align-items: stretch; }
+        .search input[type="number"] { flex: 1 1 auto; }
+      }
+      @media (min-width: 1280px) {
+        main { max-width: 1200px; }
+      }
     </style>
   </head>
   <body>
-    <main>
-      <h1>Weather-aware attraction recommendations</h1>
-      <p class="sub">Enter a Chinese city (e.g. Beijing, 北京, beijing). Rainy days favour indoor spots; hot days avoid midday outdoors.</p>
-      <form id="form">
-        <input id="city" name="city" placeholder="City name" autocomplete="off" />
-        <input id="days" name="days" type="number" min="1" max="16" value="7" style="max-width: 6rem" />
-        <button type="submit">Recommend</button>
+    <header class="hero" id="hero">
+      <h1 id="app-title">Weather-aware attraction recommendations</h1>
+      <p id="app-subtitle">Enter a Chinese city (Chinese or pinyin). Rainy days favour indoor spots; hot days avoid midday outdoors.</p>
+      <form class="search" id="form" role="search">
+        <label class="sr-only" for="city">City</label>
+        <input id="city" name="city" placeholder="Beijing / 北京 / beijing" autocomplete="off" />
+        <label class="sr-only" for="days">Days</label>
+        <input id="days" name="days" type="number" min="1" max="16" value="7" />
+        <label class="sr-only" for="lang">Language</label>
+        <select id="lang" name="lang" aria-label="Language">
+          <option value="en">English</option>
+          <option value="zh-CN">中文</option>
+        </select>
+        <button id="submit" type="submit">Recommend</button>
       </form>
-      <div id="output"></div>
+    </header>
+
+    <main>
+      <div id="weather" class="weather-strip" aria-label="weather forecast"></div>
+      <p id="summary" class="summary"></p>
+      <div id="cards" class="cards" aria-label="attractions"></div>
+      <section id="itinerary" class="itinerary" aria-label="trip itinerary"></section>
+      <p class="attribution" id="attribution">Photos © Amap (高德). Weather data © Open-Meteo.</p>
     </main>
+
     <script src="/app.js" type="module"></script>
   </body>
 </html>
