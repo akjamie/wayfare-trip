@@ -109,28 +109,32 @@ function render(data) {
     )
     .join("");
 
-  // Daily status: per-day advice + at most MAX_CARDS attractions.
-  const cards = [];
+  // Daily status: one block per day (header + advice + a nested card grid).
+  const groups = [];
   for (const day of data.days) {
-    cards.push(`<h2 class="summary">${esc(day.date)} — ${esc(day.weather.summary)}</h2>`);
-    cards.push(`<p class="summary">${esc(day.advice)}</p>`);
     const shown = (day.attractions ?? []).slice(0, MAX_CARDS);
-    if (!shown.length) {
-      cards.push(`<p class="summary">${esc(ui.noAttractions)}</p>`);
-      continue;
-    }
-    for (const a of shown) {
-      cards.push(
-        `<article class="card">${cardImage(a)}<div class="body">` +
-          `<h3>${esc(a.name_zh)} <span class="tag">${esc(a.environment)}</span></h3>` +
-          `<p class="reason">${esc(a.reason)}</p>` +
-          `<p class="intro">${esc(a.introduction)}</p>` +
-          (a.advisories?.length ? `<p class="reason">⚠ ${esc(a.advisories.join(" "))}</p>` : "") +
-          `</div></article>`,
-      );
-    }
+    const cardsHtml = shown.length
+      ? shown
+          .map(
+            (a) =>
+              `<article class="card">${cardImage(a)}<div class="body">` +
+              `<h3>${esc(a.name_zh)} <span class="tag">${esc(a.environment)}</span></h3>` +
+              `<p class="reason">${esc(a.reason)}</p>` +
+              `<p class="intro">${esc(a.introduction)}</p>` +
+              (a.advisories?.length ? `<p class="reason">⚠ ${esc(a.advisories.join(" "))}</p>` : "") +
+              `</div></article>`,
+          )
+          .join("")
+      : `<p class="summary">${esc(ui.noAttractions)}</p>`;
+    groups.push(
+      `<section class="day-group">` +
+        `<h3 class="day-head">${esc(day.date)} — ${esc(day.weather.summary)}</h3>` +
+        `<p class="summary">${esc(day.advice)}</p>` +
+        `<div class="cards">${cardsHtml}</div>` +
+        `</section>`,
+    );
   }
-  cardsEl.innerHTML = cards.join("");
+  cardsEl.innerHTML = groups.join("");
 }
 
 async function run() {

@@ -59,6 +59,10 @@
       .weather h3 { margin: 0 0 0.2rem; font-size: 0.9rem; color: var(--muted); font-weight: 600; }
       .weather .temp { font-size: 1.25rem; font-weight: 700; }
       .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+      .day-list { display: block; }
+      .day-group { margin: 0 0 1.6rem; }
+      .day-head { font-size: 1.02rem; margin: 0 0 0.25rem; }
+      .day-group .summary { margin: 0 0 0.7rem; }
       .card {
         background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
         overflow: hidden; box-shadow: 0 10px 30px #0f172a0f; display: flex; flex-direction: column;
@@ -126,7 +130,7 @@
 
       <h2 id="days-title" class="section-title">Daily status</h2>
       <div id="weather" class="weather-strip" aria-label="weather forecast"></div>
-      <div id="cards" class="cards" aria-label="attractions"></div>
+      <div id="cards" class="day-list" aria-label="attractions"></div>
 
       <p class="attribution" id="attribution">Photos © Amap (高德). Weather data © Open-Meteo.</p>
     </main>
