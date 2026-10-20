@@ -31,15 +31,20 @@ describe("website smoke", () => {
     expect(html).toContain('id="itinerary"'); // itinerary
   });
 
-  it("AC16: responsive viewport + breakpoints; images carry alt; app calls the API", async () => {
+  it("AC16: responsive viewport + breakpoints; images carry alt; grouped per-day layout", async () => {
     const base = await start();
     const html = (await (await fetch(`${base}/`)).text()).toLowerCase();
     expect(html).toContain('name="viewport"');
     expect(html).toContain("@media");
+    // #cards must be a block list (not a grid), so day headers aren't grid cells.
+    expect(html).toContain('class="day-list"');
 
     const js = await (await fetch(`${base}/app.js`)).text();
     expect(js).toContain("/api/recommend");
     expect(js).toContain("alt=");
+    // Each day is wrapped in a .day-group block with a nested .cards grid.
+    expect(js).toContain("day-group");
+    expect(js).toContain('class="cards"');
   });
 
   it("AC17: page displays Amap photo attribution", async () => {

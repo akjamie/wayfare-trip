@@ -36,7 +36,11 @@ async function serveStatic(pathname: string, res: ServerResponse): Promise<void>
   }
   try {
     const body = await readFile(full);
-    res.writeHead(200, { "content-type": CONTENT_TYPES[extname(full)] ?? "application/octet-stream" });
+    res.writeHead(200, {
+      "content-type": CONTENT_TYPES[extname(full)] ?? "application/octet-stream",
+      // Always revalidate static assets so UI fixes are picked up immediately.
+      "cache-control": "no-cache",
+    });
     res.end(body);
   } catch {
     res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
