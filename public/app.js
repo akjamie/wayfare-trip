@@ -3,21 +3,27 @@ const UI = {
     title: "Weather-aware attraction recommendations",
     subtitle: "Enter a Chinese city (Chinese or pinyin). Rainy days favour indoor spots; hot days avoid midday outdoors.",
     submit: "Recommend",
+    plan: "Trip plan",
+    days: "Daily status",
+    placeholder: "Beijing / 北京 / beijing",
     loading: "Loading…",
     noAttractions: "No attractions to show.",
     unreachable: "We couldn't reach the service. Please try again.",
-    dayPrefix: "Day",
   },
   "zh-CN": {
     title: "天气感知景点推荐",
     subtitle: "输入中国城市（支持中文或拼音）。雨天优先室内景点，高温避开正午户外。",
     submit: "推荐",
+    plan: "行程计划",
+    days: "每日天气与景点",
+    placeholder: "北京 / Beijing / beijing",
     loading: "加载中…",
     noAttractions: "暂无景点可展示。",
     unreachable: "无法连接服务，请稍后重试。",
-    dayPrefix: "第",
   },
 };
+
+const MAX_CARDS = 5;
 
 const $ = (id) => document.getElementById(id);
 const form = $("form");
@@ -31,17 +37,26 @@ const summaryEl = $("summary");
 const titleEl = $("app-title");
 const subtitleEl = $("app-subtitle");
 const submitEl = $("submit");
+const planTitleEl = $("plan-title");
+const daysTitleEl = $("days-title");
+
+let hasSearched = false;
 
 function currentLang() {
   return langSelect.value === "zh-CN" ? "zh-CN" : "en";
 }
 
 function applyUiLabels() {
-  const ui = UI[currentLang()];
+  const lang = currentLang();
+  const ui = UI[lang];
   titleEl.textContent = ui.title;
   subtitleEl.textContent = ui.subtitle;
   submitEl.textContent = ui.submit;
-  document.documentElement.lang = currentLang();
+  if (planTitleEl) planTitleEl.textContent = ui.plan;
+  if (daysTitleEl) daysTitleEl.textContent = ui.days;
+  cityInput.placeholder = ui.placeholder;
+  document.documentElement.lang = lang;
+  document.title = `${ui.title} — wayfare-trip`;
 }
 
 function esc(value) {
@@ -52,35 +67,61 @@ function esc(value) {
     .replaceAll('"', "&quot;");
 }
 
+function cardImage(a) {
+  if (a.image) {
+    return `<img src="${esc(a.image)}" alt="${esc(a.name_zh)}" loading="lazy" />`;
+  }
+  // Every card gets a visual: a gradient placeholder with the first character.
+  const initial = (a.name_zh || "?").trim().charAt(0);
+  return `<div class="card-ph" role="img" aria-label="${esc(a.name_zh)}">${esc(initial)}</div>`;
+}
+
 function render(data) {
   const ui = UI[currentLang()];
   const notices = (data.notices ?? [])
     .map((n) => `<div class="notice">${esc(n)}</div>`)
     .join("");
-  weatherEl.innerHTML = notices + data.days
-    .map(
-      (d) =>
-        `<div class="weather"><h3>${esc(d.date)}</h3><div class="temp">${esc(d.weather.summary)} ${Math.round(d.weather.tempMaxC)}°C</div>` +
-        `<div>${Math.round(d.weather.precipProb)}% · ${esc(d.weather.summary)}</div></div>`,
-    )
-    .join("");
+
+  // Plan (itinerary) — rendered into #itinerary, which sits above the daily status.
+  itineraryEl.innerHTML =
+    notices +
+    data.days
+      .filter((d) => d.itinerary?.length)
+      .map(
+        (d) =>
+          `<div class="day-panel"><h3>${esc(d.date)}</h3>` +
+          `<ul class="slots">${d.itinerary
+            .map(
+              (s) =>
+                `<li><span class="slot">${esc(s.label)}</span><span>${esc(s.name_zh)} <span class="tag">${esc(s.environment)}</span></span></li>`,
+            )
+            .join("")}</ul></div>`,
+      )
+      .join("");
 
   summaryEl.textContent = (data.summary ?? "").split("\n")[0] ?? "";
 
+  weatherEl.innerHTML = data.days
+    .map(
+      (d) =>
+        `<div class="weather"><h3>${esc(d.date)}</h3><div class="temp">${esc(d.weather.summary)} ${Math.round(d.weather.tempMaxC)}°C</div>` +
+        `<div>${Math.round(d.weather.precipProb)}%</div></div>`,
+    )
+    .join("");
+
+  // Daily status: per-day advice + at most MAX_CARDS attractions.
   const cards = [];
   for (const day of data.days) {
     cards.push(`<h2 class="summary">${esc(day.date)} — ${esc(day.weather.summary)}</h2>`);
     cards.push(`<p class="summary">${esc(day.advice)}</p>`);
-    if (!day.attractions.length) {
+    const shown = (day.attractions ?? []).slice(0, MAX_CARDS);
+    if (!shown.length) {
       cards.push(`<p class="summary">${esc(ui.noAttractions)}</p>`);
       continue;
     }
-    for (const a of day.attractions) {
-      const img = a.image
-        ? `<img src="${esc(a.image)}" alt="${esc(a.name_zh)}" loading="lazy" />`
-        : `<img alt="${esc(a.name_zh)}" />`;
+    for (const a of shown) {
       cards.push(
-        `<article class="card">${img}<div class="body">` +
+        `<article class="card">${cardImage(a)}<div class="body">` +
           `<h3>${esc(a.name_zh)} <span class="tag">${esc(a.environment)}</span></h3>` +
           `<p class="reason">${esc(a.reason)}</p>` +
           `<p class="intro">${esc(a.introduction)}</p>` +
@@ -90,20 +131,6 @@ function render(data) {
     }
   }
   cardsEl.innerHTML = cards.join("");
-
-  itineraryEl.innerHTML = data.days
-    .filter((d) => d.itinerary?.length)
-    .map(
-      (d) =>
-        `<div class="day-panel"><h3>${esc(d.date)}</h3>` +
-        `<ul class="slots">${d.itinerary
-          .map(
-            (s) =>
-              `<li><span class="slot">${esc(s.label)}</span><span>${esc(s.name_zh)} <span class="tag">${esc(s.environment)}</span></span></li>`,
-          )
-          .join("")}</ul></div>`,
-    )
-    .join("");
 }
 
 async function run() {
@@ -111,6 +138,7 @@ async function run() {
   const city = cityInput.value.trim();
   const days = daysInput.value || "7";
   const lang = currentLang();
+  hasSearched = true;
   summaryEl.textContent = ui.loading;
   cardsEl.innerHTML = "";
   itineraryEl.innerHTML = "";
@@ -137,7 +165,20 @@ form.addEventListener("submit", (event) => {
 
 langSelect.addEventListener("change", () => {
   applyUiLabels();
-  if (cityInput.value.trim()) run();
+  try {
+    localStorage.setItem("wayfare.lang", currentLang());
+  } catch {
+    /* ignore storage errors */
+  }
+  if (hasSearched) run();
 });
+
+// Restore the saved language (explicit user choice only; default stays English).
+try {
+  const saved = localStorage.getItem("wayfare.lang");
+  if (saved === "en" || saved === "zh-CN") langSelect.value = saved;
+} catch {
+  /* ignore storage errors */
+}
 
 applyUiLabels();

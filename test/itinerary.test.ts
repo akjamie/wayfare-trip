@@ -41,4 +41,24 @@ describe("itinerary", () => {
     const r = await recommend("Beijing", cfg, makeFetch(routes), 1);
     expect(r.days[0].itinerary).toHaveLength(1);
   });
+
+  it("AC12/plan: attractions are not repeated across days when the pool allows", async () => {
+    const manyPois = {
+      status: "1",
+      count: "14",
+      pois: Array.from({ length: 14 }, (_, i) => ({
+        id: `P${i}`,
+        name: `景点${i}`,
+        typecode: "140100",
+        location: "116.4,39.9",
+      })),
+    };
+    const routes = happyRoutes(weatherBody(3)).map((r) =>
+      r.match === "place/text" ? { ...r, respond: () => manyPois } : r,
+    );
+    const r = await recommend("Beijing", cfg, makeFetch(routes), 3);
+    const ids = r.days.flatMap((d) => d.itinerary.map((s) => s.id));
+    expect(ids.length).toBeGreaterThan(0);
+    expect(new Set(ids).size).toBe(ids.length); // no repeated stop across the trip
+  });
 });

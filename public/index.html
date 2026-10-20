@@ -70,6 +70,12 @@
       .card .intro { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.5rem; }
       .tag { display: inline-block; font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: #eef6f6; color: #0b6b6a; }
       .itinerary { margin-top: 1.6rem; }
+      .section-title { font-size: 1.05rem; margin: 1.6rem 0 0.6rem; color: var(--ink); }
+      .card-ph {
+        height: 150px; display: flex; align-items: center; justify-content: center;
+        font-size: 2rem; font-weight: 700; color: #fff;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      }
       .day-panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.1rem; margin-bottom: 1rem; }
       .day-panel h3 { margin: 0 0 0.3rem; }
       .day-panel .advice { color: var(--muted); margin: 0 0 0.6rem; }
@@ -113,10 +119,15 @@
     </header>
 
     <main>
-      <div id="weather" class="weather-strip" aria-label="weather forecast"></div>
       <p id="summary" class="summary"></p>
-      <div id="cards" class="cards" aria-label="attractions"></div>
+
+      <h2 id="plan-title" class="section-title">Trip plan</h2>
       <section id="itinerary" class="itinerary" aria-label="trip itinerary"></section>
+
+      <h2 id="days-title" class="section-title">Daily status</h2>
+      <div id="weather" class="weather-strip" aria-label="weather forecast"></div>
+      <div id="cards" class="cards" aria-label="attractions"></div>
+
       <p class="attribution" id="attribution">Photos © Amap (高德). Weather data © Open-Meteo.</p>
     </main>
 

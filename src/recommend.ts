@@ -36,15 +36,16 @@ export function validateDays(raw: string | null | undefined, cfg: Config): numbe
   return n;
 }
 
-function buildDay(
+const DISPLAY_LIMIT = 5;
+
+function makeDay(
   day: ForecastDay,
-  attractions: Attraction[],
+  ranked: ReturnType<typeof rankForDay>,
+  rain: boolean,
+  hot: boolean,
   cfg: Config,
   lang: Lang,
 ): DayRecommendation {
-  const rain = isRainyDay(day, cfg);
-  const hot = isHotDay(day, cfg);
-  const ranked = rankForDay(attractions, { rain, hot }, cfg, lang);
   return {
     date: day.date,
     weather: {
@@ -105,7 +106,32 @@ export async function recommend(
   const notices: string[] = [];
   if (attractions.length === 0) notices.push(t(lang, "notice.no_attraction_data"));
 
-  const dayRecs = forecast.map((d) => buildDay(d, attractions, cfg, lang));
+  const dayRecs: DayRecommendation[] = [];
+  const used = new Set<string>();
+  for (const day of forecast) {
+    const rain = isRainyDay(day, cfg);
+    const hot = isHotDay(day, cfg);
+
+    // Prefer attractions not shown on earlier days so a multi-day plan does not
+    // repeat the same places every day; only reuse once the pool is exhausted.
+    let pool = attractions.filter((a) => !used.has(a.id));
+    if (pool.length === 0) pool = attractions;
+
+    // Keep rainy-day indoor-first meaningful even late in a trip: if the unseen
+    // pool has no indoor/mixed option, bring sheltered POIs back into the pool.
+    if (rain) {
+      const shelteredFresh = pool.filter((a) => a.environment !== "outdoor");
+      if (shelteredFresh.length === 0) {
+        const shelteredAll = attractions.filter((a) => a.environment !== "outdoor");
+        const extra = shelteredAll.filter((a) => !pool.includes(a));
+        if (extra.length > 0) pool = [...pool, ...extra];
+      }
+    }
+
+    const ranked = rankForDay(pool, { rain, hot }, cfg, lang);
+    for (const a of ranked.slice(0, DISPLAY_LIMIT)) used.add(a.id);
+    dayRecs.push(makeDay(day, ranked, rain, hot, cfg, lang));
+  }
   const summary = buildSummary(city, dayRecs, notices, lang);
 
   return {

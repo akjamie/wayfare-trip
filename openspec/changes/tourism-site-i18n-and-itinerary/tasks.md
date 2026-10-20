@@ -50,10 +50,10 @@
   - verify: `npx vitest run test/web-smoke.test.ts` fails.
 - [x] 5.2 [IMPL] Redesign `public/` into a tourism-style responsive page with a language toggle, cards+images, itinerary, and attribution. (AC15, AC16, AC17)
   - evidence: AC15/AC16/AC17 pass.
-- [x] 5.3 [TEST] Assert every returned attraction carries a non-empty `name_zh` (locale-independent). (AC8)
-  - verify: `npx vitest run test/web-output.test.ts` fails.
+- [x] 5.3 [TEST] Assert every returned attraction carries a non-empty `name_zh` (locale-independent). (AC8) — covered by the pre-existing `web-output.test.ts` case (labelled AC21 in v1).
+  - verify: `npx vitest run test/web-output.test.ts` -> PASS (name_zh assertion).
 - [x] 5.4 [IMPL] Ensure `name_zh` is always populated from Amap. (AC8)
-  - evidence: AC8 passes.
+  - evidence: `src/amap.ts` sets `nameZh` from `poi.name`; AC8 assertion passes (no new failing-test step needed).
 
 ## 6. Converge & verify
 - [x] 6.1 [IMPL] Wire `lang` through `GET /api/recommend?city=&days=&lang=` and extend the response schema (lang, reason, introduction, image, itinerary). (AC7, AC10, AC11, AC12)

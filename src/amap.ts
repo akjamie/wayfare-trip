@@ -59,12 +59,16 @@ function toAttraction(poi: any, rank: number): Attraction {
     .find((u: string) => u.startsWith("https://"));
   const ratingRaw = poi?.biz_ext?.rating;
   const rating = ratingRaw !== undefined && ratingRaw !== "" ? Number(ratingRaw) : undefined;
+  const typeStr = poi?.type ? String(poi.type) : "";
+  const category = typeStr
+    ? typeStr.split(";").map((s: string) => s.trim()).filter(Boolean).pop()
+    : undefined;
   return {
     id: String(poi?.id ?? ""),
     nameZh: String(poi?.name ?? ""),
     environment: environmentForTypecode(typecode),
     typecode,
-    category: poi?.type ? String(poi.type) : undefined,
+    category,
     rating: Number.isFinite(rating) ? rating : undefined,
     photo: photoUrl ?? null,
     address: poi?.address ? String(poi.address) : undefined,
