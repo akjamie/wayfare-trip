@@ -4,3 +4,5 @@ requirement: "基于现有 '城市景点+天气推荐' 功能改版: (1) 重做�
 targetBranch: "main"
 lastPrType: "spec"
 prUrl: "https://github.com/akjamie/wayfare-trip/pull/4"
+specSha: ae491f23b2dacf3cde044313a480bbc0b20c865b
+status: ready_for_impl
