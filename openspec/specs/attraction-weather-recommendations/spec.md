@@ -6,34 +6,46 @@ Provide a website that takes a Chinese city name and returns per-day attraction 
 ## Requirements
 
 ### Requirement: City resolution and disambiguation
-The system SHALL resolve a user-supplied city name written in Chinese, pinyin, or English to a single canonical city constrained to China, returning its coordinates, an English display name, and its first-level administrative area; when several same-named cities match, the system MUST select the candidate with the highest population.
-_Story: city-attractions-weather-recommendations_
+The system SHALL resolve a user-supplied city name written in Chinese, pinyin, or English to a single canonical city constrained to China, returning its coordinates, a display name, and its first-level administrative area. Resolution SHALL use a curated major-city alias table (Chinese + pinyin + common English) first and Amap geocoding (`/v3/geocode/geo`) as a fallback. It SHALL accept only Amap matches at **city level** (`level` = 市); village/district/POI-level matches MUST be rejected, so bare pinyin of a non-listed city yields `ambiguous_city` or `unknown_city` and never a village guess. The alias table SHALL also map province names to their capital city (e.g. 广东 → 广州), and a province-only input SHALL resolve to that capital. When several city-level candidates remain, the system MUST return an `ambiguous_city` error whose candidates expose `name`, `name_zh`, and `adcode`, rather than guessing. An Amap geocode failure (network error or a non-success Amap `status`) MUST map to `attraction_source_unavailable` (503), NOT `unknown_city`; a successful geocode with no city-level match MUST be `unknown_city`.
+_Story: tourism-site-i18n-and-itinerary_
 
 #### Scenario: Resolve a Chinese city name
-- **GIVEN** a user supplies the city name "北京"
+- **GIVEN** a user supplies the city name "西安"
 - **WHEN** the system resolves the city
-- **THEN** the system returns the resolved city as Beijing with latitude/longitude, an English display name, and `admin1`, with `country = CN`
+- **THEN** the system returns Xi'an with latitude/longitude and `admin1` = Shaanxi, with `country = CN`
 
 #### Scenario: Resolve a pinyin or English city name
-- **GIVEN** a user supplies the city name "beijing" or "Beijing"
+- **GIVEN** a user supplies "Xian", "Xi'an", "beijing", or "Beijing"
 - **WHEN** the system resolves the city
-- **THEN** the system returns the same resolved city as it would for "北京"
+- **THEN** the system returns the same resolved city as the equivalent Chinese input (Xi'an / Beijing)
 
 #### Scenario: Disambiguate same-named cities
-- **GIVEN** a name matches multiple Chinese cities (e.g. 台州 / 泰州)
+- **GIVEN** a name matches several city-level Chinese candidates
 - **WHEN** the system resolves the city
-- **THEN** the system selects the candidate with the highest population and exposes the resolved English name and `admin1`
+- **THEN** the system returns an `ambiguous_city` error listing the candidates and produces no recommendations, rather than guessing
 
 #### Scenario: Unresolvable or non-China city
 - **GIVEN** a user supplies an unresolvable name (e.g. "asdfghjkl") or a non-China city (e.g. "Paris")
 - **WHEN** the system attempts to resolve the city
 - **THEN** the system returns a distinct `unknown_city` error and produces no recommendations
 
+#### Scenario: Province-level input resolves to its capital
+- **GIVEN** a user supplies a province name such as "广东"
+- **WHEN** the system resolves the city
+- **THEN** the system resolves it to the province capital (Guangzhou) rather than a village or POI
+
+#### Scenario: Geocode upstream failure is not unknown_city
+- **GIVEN** the Amap geocode fallback fails (network error or non-success Amap status)
+- **WHEN** the system attempts to resolve the city
+- **THEN** the system returns `attraction_source_unavailable` (503), not `unknown_city`
+
 **Acceptance criteria**
-- [ ] AC1: "北京", "beijing", and "Beijing" all resolve to the same location with non-empty latitude/longitude and `country = CN`. (test: test/city-resolve.test.ts)
-- [ ] AC2: When a name matches multiple Chinese cities, the highest-population candidate is chosen and the result includes an English name and `admin1`. (test: test/city-resolve.test.ts)
-- [ ] AC3: An unresolvable name returns an `unknown_city` error and no recommendation payload. (test: test/city-resolve.test.ts)
-- [ ] AC4: A non-China city (e.g. "Paris") returns `unknown_city` because resolution is constrained to `country = CN`. (test: test/city-resolve.test.ts)
+- [ ] AC1: "西安", "Xian", and "Xi'an" all resolve to Xi'an (`adcode=610100`); "北京"/"beijing"/"Beijing" resolve to Beijing. (test: test/city-resolve.test.ts)
+- [ ] AC2: A name matching multiple city-level candidates returns `ambiguous_city` with a non-empty candidate list (each exposing `name`, `name_zh`, `adcode`) and no recommendations (never a wrong pick). (test: test/city-resolve.test.ts)
+- [ ] AC3: An unresolvable name returns `unknown_city` and no recommendation payload. (test: test/city-resolve.test.ts)
+- [ ] AC4: A non-China city (e.g. "Paris") returns `unknown_city`. (test: test/city-resolve.test.ts)
+- [ ] AC5: Province-only input (e.g. "广东") resolves to its capital (Guangzhou); village/POI-level matches are rejected. (test: test/city-resolve.test.ts)
+- [ ] AC6: An Amap geocode failure yields `attraction_source_unavailable` (503), while a successful geocode with no city-level match yields `unknown_city`. (test: test/city-resolve.test.ts)
 
 ### Requirement: Amap attraction retrieval and environment classification
 The system SHALL obtain the resolved city's `adcode` via Amap reverse geocoding at the resolved coordinates, query the Amap Web Service `place/text` API with `city=<adcode>` and `citylimit=true` constrained to scenic and museum-type POIs (`types=110000|140100|140200|140400|140600`), annotate every attraction with an `environment` of `indoor`, `outdoor`, or `mixed` derived from its Amap `typecode` via a configurable mapping, and cache per-city results with a TTL to limit Amap calls.
@@ -155,24 +167,6 @@ _Story: city-attractions-weather-recommendations_
 - [ ] AC18: Within a tier, ordering preserves Amap relevance order and breaks ties by POI `id` ascending; repeated runs over the same cached/mocked input are identical. (test: test/ranking.test.ts)
 - [ ] AC19: Each day's ranked list is capped at top-N (default 10, configurable). (test: test/ranking.test.ts)
 
-### Requirement: English default website output
-The system SHALL serve a website whose UI text, advice, weather summaries, and city output are in English, and SHALL emit a structured JSON payload plus an English human-readable summary; Amap attractions SHALL expose their proper name as `name_zh`.
-_Story: city-attractions-weather-recommendations_
-
-#### Scenario: English system output
-- **GIVEN** a successful recommendation
-- **WHEN** the system formats the result
-- **THEN** all UI, advice, weather-summary, and city strings are English, and the response contains both a JSON payload and a non-empty English summary
-
-#### Scenario: Attraction names use the source name
-- **GIVEN** an Amap attraction whose only available name is Chinese
-- **WHEN** the system returns the attraction
-- **THEN** the attraction includes a non-empty `name_zh`
-
-**Acceptance criteria**
-- [ ] AC20: All UI/advice/weather/city strings in the default response are English, and the response carries both a JSON payload and a non-empty English summary. (test: test/web-output.test.ts)
-- [ ] AC21: Every returned attraction carries a non-empty `name_zh`. (test: test/web-output.test.ts)
-
 ### Requirement: HTTP interface contract and input validation
 The system SHALL expose `GET /api/recommend?city=<name>&days=<n>` returning a JSON payload with the documented schema, SHALL validate input (rejecting empty, whitespace-only, or longer-than-64-character `city`, and `days` outside 1–16, with `400 invalid_input`), and SHALL return errors as a body of `{ "error_code": ..., "message": ... }`.
 _Story: city-attractions-weather-recommendations_
@@ -220,3 +214,109 @@ _Story: city-attractions-weather-recommendations_
 - [ ] AC25: An Amap error status (incl. quota `infocode=10003`), invalid key, or timeout yields `503 attraction_source_unavailable` with a user-friendly English message. (test: test/upstream-errors.test.ts)
 - [ ] AC26: A successful Amap response with zero scenic POIs yields `200` with a `no_attraction_data` notice and empty attraction lists. (test: test/upstream-errors.test.ts)
 - [ ] AC27: The taxonomy holds: `400` for `unknown_city`/`invalid_input`, `503` for `forecast_unavailable`/`attraction_source_unavailable`, `200` for `no_attraction_data`. (test: test/upstream-errors.test.ts)
+
+### Requirement: Localized website output (English and Chinese)
+The system SHALL support `en` and `zh-CN` output, defaulting to `en`, selectable via a UI toggle and a `lang` request parameter, resolved by the precedence `lang` parameter → `Accept-Language` → `en`, where an unsupported `lang` value (e.g. `fr`) MUST fall back to `en` rather than error. It SHALL localize UI labels, advice, weather summaries, environment/category labels, and itinerary labels, and SHALL emit a structured JSON payload plus a localized human-readable summary; Amap attractions SHALL expose their proper name as `name_zh` with an optional `name_en`.
+_Story: tourism-site-i18n-and-itinerary_
+
+#### Scenario: English is the default
+- **GIVEN** a successful request with no `lang`
+- **WHEN** the system formats the result
+- **THEN** all system text is English and the response includes a non-empty English summary
+
+#### Scenario: Chinese output is selectable
+- **GIVEN** a request with `lang=zh-CN`
+- **WHEN** the system formats the result
+- **THEN** UI/advice/weather/env/itinerary text is Chinese and the summary is Chinese
+
+#### Scenario: Attraction names use the source name
+- **GIVEN** an Amap attraction whose only available name is Chinese
+- **WHEN** the system returns the attraction
+- **THEN** the attraction includes a non-empty `name_zh` and `name_en` may be absent
+
+#### Scenario: Unsupported language falls back to English
+- **GIVEN** a request with an unsupported `lang` value (e.g. `fr`)
+- **WHEN** the system formats the result
+- **THEN** the result is returned in English with no error
+
+**Acceptance criteria**
+- [ ] AC7: `lang=en` (default) returns all system text in English; `lang=zh-CN` returns UI/advice/weather/env/itinerary text in Chinese; both carry a JSON payload and a same-language summary. (test: test/i18n.test.ts)
+- [ ] AC8: Every returned attraction carries a non-empty `name_zh`. (test: test/web-output.test.ts)
+- [ ] AC9: An unsupported `lang` (e.g. `fr`) falls back to English output rather than returning an error. (test: test/i18n.test.ts)
+
+### Requirement: Recommendation reasons
+Each recommended attraction SHALL include a localized `reason` explaining why it suits that day, derived from the day's weather (reusing the rainy/hot classification of the retained `Indoor-first when there is precipitation` and `Avoid midday outdoor when hot` requirements) plus the attraction's environment and category.
+_Story: tourism-site-i18n-and-itinerary_
+
+#### Scenario: Rain day reason
+- **GIVEN** a rainy day
+- **WHEN** the system builds a recommendation
+- **THEN** each attraction's `reason` is non-empty and mentions the weather-driven fit (e.g. indoor/sheltered) in the selected language
+
+#### Scenario: Hot day reason
+- **GIVEN** a hot day
+- **WHEN** the system builds a recommendation
+- **THEN** an outdoor attraction's `reason` notes the midday-heat caution
+
+**Acceptance criteria**
+- [ ] AC10: On every day, every ranked attraction carries a non-empty localized `reason` that references the day's weather condition. (test: test/recommendation-detail.test.ts)
+
+### Requirement: Attraction introductions and photos
+Each attraction SHALL include a localized `introduction` assembled from Amap attributes (category/type, environment, rating, address) and an `image` field holding an `https` Amap-origin photo URL when available (otherwise `null`); non-Amap or `http` photo URLs MUST be discarded rather than rendered. Introductions MUST be attribute-based, not free-form generated prose.
+_Story: tourism-site-i18n-and-itinerary_
+
+#### Scenario: Introduction from attributes
+- **GIVEN** an Amap attraction with category, environment, rating, and address
+- **WHEN** the system formats the attraction
+- **THEN** `introduction` is a non-empty localized string built from those attributes
+
+#### Scenario: Missing photo degrades gracefully
+- **GIVEN** an Amap attraction with no photo
+- **WHEN** the system returns the attraction
+- **THEN** `image` is `null` and the response is still valid
+
+**Acceptance criteria**
+- [ ] AC11: Every attraction includes a non-empty localized `introduction` and an `image` that is an `https` Amap URL or `null`. (test: test/recommendation-detail.test.ts)
+
+### Requirement: Trip itinerary
+The system SHALL produce, for each forecast day, an itinerary with localized time-of-day slots (morning/afternoon/evening) containing up to 4 attractions drawn from that day's ranked list, ordered such that EVERY stop on a day classified as rainy is an indoor or mixed-environment attraction (using the environment rule of the retained `Amap attraction retrieval and environment classification` requirement) and no outdoor attraction is placed in the midday slot on a day classified as hot. Rainy/hot classification SHALL reuse the thresholds of the retained `Indoor-first when there is precipitation` and `Avoid midday outdoor when hot` requirements, and the itinerary MUST be consistent with that day's advice. When a day's ranked list has fewer than 2 attractions, the itinerary SHALL contain the available stops (1–4) without error.
+_Story: tourism-site-i18n-and-itinerary_
+
+#### Scenario: Itinerary per day
+- **GIVEN** a resolved city with N forecast days
+- **WHEN** the system emits recommendations
+- **THEN** each day includes an `itinerary` of 2–4 time-slotted stops (or all available, 1–4, when fewer are present) with localized slot labels
+
+#### Scenario: Weather-aware itinerary
+- **GIVEN** a rainy day and a hot day
+- **WHEN** the system builds each itinerary
+- **THEN** every stop on the rainy day is indoor or mixed and the hot day places no outdoor attraction in the midday slot, consistent with each day's advice
+
+#### Scenario: Fewer attractions than slots
+- **GIVEN** a day whose ranked list has a single attraction
+- **WHEN** the system builds that day's itinerary
+- **THEN** the itinerary contains that one stop and no error
+
+**Acceptance criteria**
+- [ ] AC12: Each day includes an `itinerary` of 2–4 time-slotted stops (or all available, 1–4, when fewer than 2) drawn from that day's ranked attractions, with localized slot labels. (test: test/itinerary.test.ts)
+- [ ] AC13: Every stop on a rainy day is indoor/mixed and a hot day's midday slot contains no outdoor attraction, consistent with the day's advice. (test: test/itinerary.test.ts)
+- [ ] AC14: A day whose ranked list has 1 attraction yields a 1-stop itinerary without error. (test: test/itinerary.test.ts)
+
+### Requirement: Tourism-style responsive website
+The system SHALL serve a tourism-style page comprising a hero/search area, a language toggle, a weather forecast strip, attraction cards (each with an image and a short reason), and the day-by-day itinerary; the page SHALL declare a responsive viewport, define responsive breakpoints, avoid horizontal overflow, give every attraction image a non-empty `alt`, and display Amap photo attribution.
+_Story: tourism-site-i18n-and-itinerary_
+
+#### Scenario: Required sections are present
+- **GIVEN** the website is served
+- **WHEN** the page is loaded
+- **THEN** it contains the hero/search area, language toggle, weather strip, attraction cards, and itinerary sections
+
+#### Scenario: Responsive and accessible markup
+- **GIVEN** the served page
+- **WHEN** its markup and styles are inspected
+- **THEN** it declares a responsive viewport and breakpoints, and every attraction image carries a non-empty `alt`
+
+**Acceptance criteria**
+- [ ] AC15: The served page contains the hero/search, language toggle, weather strip, attraction cards, and itinerary sections. (test: test/web-smoke.test.ts)
+- [ ] AC16: The page declares a responsive viewport (`<meta name="viewport">`), its CSS defines breakpoints, and every attraction image has a non-empty `alt`. (test: test/web-smoke.test.ts)
+- [ ] AC17: The page displays Amap photo attribution. (test: test/web-smoke.test.ts)
