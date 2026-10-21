@@ -1,18 +1,32 @@
 export type ErrorCode =
   | "invalid_input"
   | "unknown_city"
+  | "ambiguous_city"
   | "forecast_unavailable"
   | "attraction_source_unavailable";
+
+export interface CityCandidate {
+  name: string;
+  name_zh: string;
+  adcode: string;
+}
 
 export class AppError extends Error {
   readonly code: ErrorCode;
   readonly status: number;
+  readonly candidates?: CityCandidate[];
 
-  constructor(code: ErrorCode, message: string, status: number) {
+  constructor(
+    code: ErrorCode,
+    message: string,
+    status: number,
+    candidates?: CityCandidate[],
+  ) {
     super(message);
     this.name = "AppError";
     this.code = code;
     this.status = status;
+    if (candidates) this.candidates = candidates;
   }
 
   static invalidInput(
@@ -25,6 +39,15 @@ export class AppError extends Error {
     message = "We couldn't find that city. Please check the spelling and try again.",
   ): AppError {
     return new AppError("unknown_city", message, 400);
+  }
+
+  static ambiguousCity(candidates: CityCandidate[]): AppError {
+    return new AppError(
+      "ambiguous_city",
+      "Multiple cities match. Please choose one of the candidates.",
+      400,
+      candidates,
+    );
   }
 
   static forecastUnavailable(

@@ -1,83 +1,97 @@
 import { describe, it, expect } from "vitest";
 import { resolveCity } from "../src/city.js";
-import { makeFetch, GEO, beijingGeo } from "./helpers.js";
+import { loadConfig } from "../src/config.js";
+import { makeFetch, AMAP_GEOCODE } from "./helpers.js";
 
-const T = 1000;
+const cfg = { ...loadConfig({} as Record<string, string>, {}), amapKey: "testkey" };
 
 describe("city resolution", () => {
-  it("AC1: Chinese, pinyin, and English resolve to the same China city", async () => {
-    const f = makeFetch([{ match: GEO, respond: () => beijingGeo }]);
-    const a = await resolveCity("北京", f, T);
-    const b = await resolveCity("beijing", f, T);
-    const c = await resolveCity("Beijing", f, T);
+  it("AC1: 西安/Xian/Xi'an -> Xi'an (610100); 北京/beijing/Beijing -> Beijing, offline", async () => {
+    const offline = makeFetch([], { fail: () => true }); // any fetch would throw
+
+    const a = await resolveCity("西安", cfg, offline);
+    const b = await resolveCity("Xian", cfg, offline);
+    const c = await resolveCity("Xi'an", cfg, offline);
     for (const r of [a, b, c]) {
-      expect(r.name).toBe("Beijing");
-      expect(r.lat).not.toBe(0);
-      expect(r.lon).not.toBe(0);
-      expect(r.country).toBe("CN");
+      expect(r.name).toBe("Xi'an");
+      expect(r.adcode).toBe("610100");
+      expect(r.admin1).toBe("Shaanxi");
     }
-    expect(a).toEqual(b);
-    expect(b).toEqual(c);
+
+    const bj = await resolveCity("Beijing", cfg, offline);
+    expect(bj.adcode).toBe("110000");
+
+    // Alias hits must not touch the network.
+    expect(offline.calls.length).toBe(0);
   });
 
-  it("AC2: same-named cities are disambiguated by highest population", async () => {
+  it("AC5: province input 广东 resolves to its capital Guangzhou (offline)", async () => {
+    const offline = makeFetch([], { fail: () => true });
+    const r = await resolveCity("广东", cfg, offline);
+    expect(r.name).toBe("Guangzhou");
+    expect(r.adcode).toBe("440100");
+    expect(offline.calls.length).toBe(0);
+  });
+
+  it("AC2: multiple city-level candidates -> ambiguous_city with candidates", async () => {
     const f = makeFetch([
       {
-        match: GEO,
+        match: AMAP_GEOCODE,
         respond: () => ({
-          results: [
-            {
-              name: "Taizhou",
-              latitude: 32.4,
-              longitude: 119.9,
-              country_code: "CN",
-              admin1: "Jiangsu",
-              population: 5000000,
-            },
-            {
-              name: "Taizhou",
-              latitude: 28.6,
-              longitude: 121.4,
-              country_code: "CN",
-              admin1: "Zhejiang",
-              population: 6000000,
-            },
+          status: "1",
+          geocodes: [
+            { city: "台州市", province: "浙江省", adcode: "331000", level: "市", location: "121.4,28.6" },
+            { city: "泰州市", province: "江苏省", adcode: "321200", level: "市", location: "119.9,32.4" },
           ],
         }),
       },
     ]);
-    const r = await resolveCity("Taizhou", f, T);
-    expect(r.population).toBe(6000000);
-    expect(r.admin1).toBe("Zhejiang");
-    expect(r.name).toBe("Taizhou");
+    let caught: any;
+    try {
+      await resolveCity("Taizhou", cfg, f);
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught?.code).toBe("ambiguous_city");
+    expect(caught?.status).toBe(400);
+    expect(caught?.candidates?.length).toBe(2);
+    expect(caught?.candidates?.[0]).toHaveProperty("adcode");
+    expect(caught?.candidates?.[0]).toHaveProperty("name_zh");
   });
 
-  it("AC3: an unresolvable name throws unknown_city", async () => {
-    const f = makeFetch([{ match: GEO, respond: () => ({ results: [] }) }]);
-    await expect(resolveCity("asdfghjkl", f, T)).rejects.toMatchObject({
+  it("AC3: unresolvable -> unknown_city", async () => {
+    const f = makeFetch([{ match: AMAP_GEOCODE, respond: () => ({ status: "1", geocodes: [] }) }]);
+    await expect(resolveCity("asdfghjkl", cfg, f)).rejects.toMatchObject({
       code: "unknown_city",
     });
   });
 
-  it("AC4: a non-China city (Paris) throws unknown_city", async () => {
+  it("AC4: non-China / non-city-level only -> unknown_city", async () => {
     const f = makeFetch([
       {
-        match: GEO,
+        match: AMAP_GEOCODE,
         respond: () => ({
-          results: [
-            {
-              name: "Paris",
-              latitude: 48.85,
-              longitude: 2.35,
-              country_code: "FR",
-              admin1: "Île-de-France",
-              population: 2148000,
-            },
+          status: "1",
+          geocodes: [
+            { city: "Paris", province: "", adcode: "", level: "国家", location: "2.35,48.85" },
           ],
         }),
       },
     ]);
-    await expect(resolveCity("Paris", f, T)).rejects.toMatchObject({
+    await expect(resolveCity("Paris", cfg, f)).rejects.toMatchObject({
+      code: "unknown_city",
+    });
+  });
+
+  it("AC6: geocode failure -> attraction_source_unavailable; no city-level -> unknown_city", async () => {
+    const failing = makeFetch([], { fail: (u) => u.includes(AMAP_GEOCODE) });
+    await expect(resolveCity("Somewhereville", cfg, failing)).rejects.toMatchObject({
+      code: "attraction_source_unavailable",
+      status: 503,
+    });
+
+    const ok = makeFetch([{ match: AMAP_GEOCODE, respond: () => ({ status: "1", geocodes: [] }) }]);
+    await expect(resolveCity("Somewhereville", cfg, ok)).rejects.toMatchObject({
       code: "unknown_city",
     });
   });

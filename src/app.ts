@@ -7,6 +7,7 @@ import { httpFetch, type FetchLike } from "./http.js";
 import { recommend, validateDays } from "./recommend.js";
 import { AmapClient } from "./amap.js";
 import { AppError } from "./errors.js";
+import { resolveLang } from "./i18n.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = normalize(join(HERE, "..", "public"));
@@ -35,7 +36,11 @@ async function serveStatic(pathname: string, res: ServerResponse): Promise<void>
   }
   try {
     const body = await readFile(full);
-    res.writeHead(200, { "content-type": CONTENT_TYPES[extname(full)] ?? "application/octet-stream" });
+    res.writeHead(200, {
+      "content-type": CONTENT_TYPES[extname(full)] ?? "application/octet-stream",
+      // Always revalidate static assets so UI fixes are picked up immediately.
+      "cache-control": "no-cache",
+    });
     res.end(body);
   } catch {
     res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
@@ -57,13 +62,22 @@ export function createApp(
         if (url.pathname === "/api/recommend") {
           const days = validateDays(url.searchParams.get("days"), cfg);
           const city = url.searchParams.get("city") ?? "";
-          sendJson(res, 200, await recommend(city, cfg, fetchImpl, days, amap));
+          const lang = resolveLang(
+            url.searchParams.get("lang"),
+            (req.headers["accept-language"] as string | undefined) ?? null,
+          );
+          sendJson(res, 200, await recommend(city, cfg, fetchImpl, days, amap, lang));
           return;
         }
         await serveStatic(url.pathname, res);
       } catch (err) {
         if (err instanceof AppError) {
-          sendJson(res, err.status, { error_code: err.code, message: err.message });
+          const body: Record<string, unknown> = {
+            error_code: err.code,
+            message: err.message,
+          };
+          if (err.candidates) body.candidates = err.candidates;
+          sendJson(res, err.status, body);
         } else {
           sendJson(res, 500, {
             error_code: "internal_error",

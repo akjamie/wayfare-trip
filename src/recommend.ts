@@ -3,8 +3,10 @@ import { httpFetch, type FetchLike } from "./http.js";
 import { resolveCity } from "./city.js";
 import { AmapClient } from "./amap.js";
 import { fetchForecast } from "./weather.js";
-import { dayAdvice, isHotDay, isRainyDay, weatherText } from "./advice.js";
+import { dayAdvice, isHotDay, isRainyDay } from "./advice.js";
+import { DEFAULT_LANG, t, weatherText, type Lang } from "./i18n.js";
 import { rankForDay } from "./rank.js";
+import { buildItinerary } from "./itinerary.js";
 import { AppError } from "./errors.js";
 import type {
   Attraction,
@@ -34,24 +36,28 @@ export function validateDays(raw: string | null | undefined, cfg: Config): numbe
   return n;
 }
 
-function buildDay(
+const DISPLAY_LIMIT = 5;
+
+function makeDay(
   day: ForecastDay,
-  attractions: Attraction[],
+  ranked: ReturnType<typeof rankForDay>,
+  rain: boolean,
+  hot: boolean,
   cfg: Config,
+  lang: Lang,
 ): DayRecommendation {
-  const rain = isRainyDay(day, cfg);
-  const hot = isHotDay(day, cfg);
   return {
     date: day.date,
     weather: {
-      summary: weatherText(day.weatherCode),
+      summary: weatherText(lang, day.weatherCode),
       tempMaxC: day.tempMaxC,
       tempMinC: day.tempMinC,
       precipProb: day.precipProb,
       weatherCode: day.weatherCode,
     },
-    advice: dayAdvice(day, rain, hot, cfg),
-    attractions: rankForDay(attractions, { rain, hot }, cfg),
+    advice: dayAdvice(day, rain, hot, cfg, lang),
+    attractions: ranked,
+    itinerary: buildItinerary(ranked, { rain, hot }, lang),
   };
 }
 
@@ -59,14 +65,15 @@ function buildSummary(
   city: { name: string; admin1: string },
   days: DayRecommendation[],
   notices: string[],
+  lang: Lang,
 ): string {
   const where = city.admin1 ? `${city.name} (${city.admin1})` : city.name;
   const lines = [
-    `Weather-aware attraction recommendations for ${where}, ${days.length} day(s) ahead:`,
+    t(lang, "summary.header", { city: where, days: days.length }),
     ...days.map((d) => `- ${d.date}: ${d.advice}`),
   ];
   if (notices.length) {
-    lines.push("", "Notes:", ...notices.map((n) => `- ${n}`));
+    lines.push("", ...notices.map((n) => `- ${n}`));
   }
   return lines.join("\n");
 }
@@ -77,17 +84,16 @@ export async function recommend(
   fetchImpl: FetchLike = httpFetch,
   days?: number,
   amap?: AmapClient,
+  lang: Lang = DEFAULT_LANG,
 ): Promise<Recommendation> {
   const cityInput = validateCity(rawCity);
   const horizon = days ?? cfg.forecastDays;
 
-  const city = await resolveCity(cityInput, fetchImpl, cfg.timeoutMs);
+  const city = await resolveCity(cityInput, cfg, fetchImpl);
 
-  // Reuse a long-lived client (with its TTL cache) when the caller provides one,
-  // so the per-city Amap cache survives across requests.
+  // Reuse a long-lived client (with its TTL cache) when the caller provides one.
   const client = amap ?? new AmapClient(fetchImpl, cfg.amapKey, cfg);
-  const adcode = await client.adcodeFor(city.lat, city.lon);
-  const attractions = await client.attractions(adcode);
+  const attractions = await client.attractions(city.adcode);
 
   const forecast = await fetchForecast(
     city.lat,
@@ -98,14 +104,41 @@ export async function recommend(
   );
 
   const notices: string[] = [];
-  if (attractions.length === 0) notices.push(NO_ATTRACTION_NOTICE);
+  if (attractions.length === 0) notices.push(t(lang, "notice.no_attraction_data"));
 
-  const dayRecs = forecast.map((d) => buildDay(d, attractions, cfg));
-  const summary = buildSummary(city, dayRecs, notices);
+  const dayRecs: DayRecommendation[] = [];
+  const used = new Set<string>();
+  for (const day of forecast) {
+    const rain = isRainyDay(day, cfg);
+    const hot = isHotDay(day, cfg);
+
+    // Prefer attractions not shown on earlier days so a multi-day plan does not
+    // repeat the same places every day; only reuse once the pool is exhausted.
+    let pool = attractions.filter((a) => !used.has(a.id));
+    if (pool.length === 0) pool = attractions;
+
+    // Keep rainy-day indoor-first meaningful even late in a trip: if the unseen
+    // pool has no indoor/mixed option, bring sheltered POIs back into the pool.
+    if (rain) {
+      const shelteredFresh = pool.filter((a) => a.environment !== "outdoor");
+      if (shelteredFresh.length === 0) {
+        const shelteredAll = attractions.filter((a) => a.environment !== "outdoor");
+        const extra = shelteredAll.filter((a) => !pool.includes(a));
+        if (extra.length > 0) pool = [...pool, ...extra];
+      }
+    }
+
+    const ranked = rankForDay(pool, { rain, hot }, cfg, lang);
+    for (const a of ranked.slice(0, DISPLAY_LIMIT)) used.add(a.id);
+    dayRecs.push(makeDay(day, ranked, rain, hot, cfg, lang));
+  }
+  const summary = buildSummary(city, dayRecs, notices, lang);
 
   return {
+    lang,
     city: {
       name: city.name,
+      name_zh: city.nameZh,
       admin1: city.admin1,
       lat: city.lat,
       lon: city.lon,
