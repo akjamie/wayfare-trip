@@ -98,10 +98,17 @@ Error contract (existing, extended):
 | attraction/hotel upstream failure | 503 | `attraction_source_unavailable` |
 | zero hotels / zero attractions | 200 | notice in `notices[]` |
 
+Contract conformance notes (vs the active spec):
+- `hotelFilters` echoes **only the keys the caller supplied** (omitted keys are absent, never defaulted).
+- `days[].route` is **always present**; a day with no stops yields `{ legs: [], totalDistanceKm: 0, totalDurationMin: 0 }`.
+- Empty hotels are signalled via `notices[]` using the localized `notice.no_hotel_data` key (spec AC9).
+- `days[].route` is derived from that day's already weather-aware `itinerary` stops (rain indoor/mixed, hot midday outdoor avoided), so the route inherits those rules.
+
 ## 4. External Services & 3rd-Party API Integration
 - **Endpoint**: `GET https://restapi.amap.com/v3/place/text?types=100000&city=<adcode>&citylimit=true&extensions=all&offset=25&page=1&key=<key>`.
 - **Auth**: Web Service key from `AMAP_KEY`/`AMAP_API_KEY`; server-side only, never sent to the browser.
-- **Data mapping**: star from `typecode` (`100101/100102`→5, `100103`→4, `100104`→3, `100105`→2); `price`←`biz_ext.cost`; `rating`←`biz_ext.rating`; `image`←first `photos[].url` that is `https`; `address`←`address`.
+- **Data mapping**: star from `typecode` (`100101`/`100102`→5, `100103`→4, `100104`→3, `100105`→2 economy); `price`←`biz_ext.cost`; `rating`←`biz_ext.rating`; `image`←first `photos[].url` that is `https`; `address`←`address`.
+- **Filter semantics**: economy (`star 2`) only appears when no `star` filter is set. When any price bound is provided, POIs whose `cost` is missing are **excluded** (never guessed); with no price filter they are kept with `price: undefined`. Star filters compare the typecode-derived level exactly.
 - **Quotas**: search ~100/day (personal) shared with attraction search; LBS quota unaffected (no route API).
 - **Client lifecycle & caching**: reuse the single `AmapClient`; add a hotel cache keyed by `adcode + normalizedFilters` with TTL = `cacheTtlMs` (default 24h). Never instantiate per request.
 - **Retry**: no retry loop; a single 3000 ms `AbortController` timeout; failures map to the taxonomy.
@@ -137,6 +144,7 @@ Spacing & radii: `--radius: 18px`; `--spacing-unit: 8px`.
 ### 5.3 Hero Moment & Component Layout
 - Hero: one-line title + subtitle + the **search row** (city, days, language, collapsible **Hotel preferences**, Search, Clear).
 - New sections, top→bottom: **Trip plan** (itinerary) → **Hotels** (primary highlighted + alternatives) → **Daily status** (weather strip + attraction cards) → **per-day Route** (ordered legs: mode · distance · time).
+- Attribution & localization: keep Amap photo attribution visible for attraction **and** hotel images (spec AC7); all hotel/route labels come from the `en`/`zh-CN` catalogs (parity enforced, no missing-key placeholders).
 - Breakpoints (Vercel-aligned):
   - Mobile `<= 640px`: single column, stacked search, tap targets ≥ 44px.
   - Tablet `641–1024px`: adaptive 2-column card grid.
@@ -172,6 +180,16 @@ Anti-AI-slop: no arbitrary purple-on-black, no gradient text on single words, no
 - **Additive contract** vs versioned endpoint → existing clients keep working.
 - **Hotel API failure = 503** vs silent skip → consistent with the retained upstream taxonomy; *zero results* is the only non-error empty case.
 - **`biz_ext.cost` as price** vs a paid hotel API → sufficient for a preference filter; missing values degrade.
+
+### 7.1 Spec coverage (active change: `hotel-route-search-redesign`)
+Reviewed against `openspec/changes/hotel-route-search-redesign/specs/attraction-weather-recommendations/spec.md` (AC1–AC14) plus the retained living spec.
+
+| AC | Design coverage |
+| :-- | :-- |
+| AC1–AC4 (contract, filters, validation) | §3 Interface Contracts + error contract; §6.1 validation |
+| AC5–AC7 (page sections, responsive/alt, attribution) | §5.2 tokens, §5.3 layout + attribution, §5.4 states |
+| AC8–AC10 (hotel model, star/price filters) | §3 `Hotel`; §4 data mapping + filter semantics |
+| AC11–AC14 (route, legs, nearest-neighbor, no-hotel) | §2 route step; §3 `RouteLeg`/`DayRoute`; §7 offline routing |
 
 ## 8. Migration, Rollout & Rollback
 - No database or data migration. Deploy is a normal release.
