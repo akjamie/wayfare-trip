@@ -43,6 +43,26 @@
 
 - **F1 — NFR** → Cache hotel search per city+filters (TTL); compute routes locally; keep p95 < 2000 ms.
 
+## Round 2 — spec-review resolutions
+
+- **B1 (star semantics)** → **Minimum level**: `star=N` means derived level `>= N` (UI "3★+ / 4★+ / 5★"). Aligned in spec scenario/AC9, design §4, and proposal.
+
+- **Hotel upstream failure** → maps to `503 attraction_source_unavailable` with no partial plan (scenario + AC16).
+
+- **`durationMin` rule** → `round(distanceKm / speed × 60)`, walk 5 km/h, drive 30 km/h; `mode = walk` when `distanceKm <= 2`, else `drive` (AC12).
+
+- **Ranking determinism** → filter match → rating desc (missing last) → distance to the centroid of **all itinerary stops across the trip** asc → POI `id` asc (AC8).
+
+- **Localization** → hotel/route labels + `no_hotel_data` localized in `en`/`zh-CN` with catalog parity (AC18).
+
+- **Price bounds** → non-negative **integers**; non-integer, negative, or inverted (`priceMin > priceMax`) → `400 invalid_input` (AC4).
+
+- **Route endpoints** → `from`/`to` hold POI `id`s (deterministic tests) (AC12).
+
+- **Zero hotels / zero stops** → zero hotels = `200` + `no_hotel_data` + hotel-less routes (AC15); zero stops = empty route with zero totals (AC17).
+
+- **Unknown star level** → excluded when a `star` filter is set (mirrors the unknown-cost exclusion).
+
 ## Open questions
 <!-- must be empty before the spec is written -->
 (none)

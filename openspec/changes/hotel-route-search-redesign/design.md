@@ -67,8 +67,12 @@ interface Hotel {
   primary: boolean;
   lat: number; lon: number;
 }
+// ranking: filter match → rating desc (missing last) → distance to itinerary-stop centroid asc → id asc
+// `star` filter is a MINIMUM (level >= star); unknown level excluded when star is set
 
 type Mode = "walk" | "drive";
+// from/to are POI `id`s (hotel id or stop id); durationMin = round(distanceKm / speedKmh * 60)
+// speedKmh: walk 5, drive 30; mode = distanceKm <= 2 ? "walk" : "drive"
 interface RouteLeg { from: string; to: string; distanceKm: number; durationMin: number; mode: Mode }
 interface DayRoute { legs: RouteLeg[]; totalDistanceKm: number; totalDurationMin: number }
 
@@ -107,8 +111,9 @@ Contract conformance notes (vs the active spec):
 ## 4. External Services & 3rd-Party API Integration
 - **Endpoint**: `GET https://restapi.amap.com/v3/place/text?types=100000&city=<adcode>&citylimit=true&extensions=all&offset=25&page=1&key=<key>`.
 - **Auth**: Web Service key from `AMAP_KEY`/`AMAP_API_KEY`; server-side only, never sent to the browser.
-- **Data mapping**: star from `typecode` (`100101`/`100102`→5, `100103`→4, `100104`→3, `100105`→2 economy); `price`←`biz_ext.cost`; `rating`←`biz_ext.rating`; `image`←first `photos[].url` that is `https`; `address`←`address`.
-- **Filter semantics**: economy (`star 2`) only appears when no `star` filter is set. When any price bound is provided, POIs whose `cost` is missing are **excluded** (never guessed); with no price filter they are kept with `price: undefined`. Star filters compare the typecode-derived level exactly.
+- **Data mapping**: star from `typecode` (`100101`/`100102`→5, `100103`→4, `100104`→3, `100105`→2 economy); other hotel typecodes (e.g. `100100`, `100200`, `100201`) have no level → `star: undefined`. `price`←`biz_ext.cost`; `rating`←`biz_ext.rating`; `image`←first `photos[].url` that is `https`; `address`←`address`.
+- **Filter semantics**: star is a **minimum** level (`level >= star`), so a 5★ hotel matches `star=4`; hotels with an unknown level are **excluded** when a star filter is set. Economy (`star 2`) therefore appears only when no star filter is set. When any price bound is provided, POIs whose `cost` is missing are **excluded** (never guessed); with no price filter they are kept with `price: undefined`.
+- **Ranking (deterministic)**: filter match → `rating` descending (missing rating ranks last) → distance to the **centroid of all itinerary stops across the trip** ascending → POI `id` ascending.
 - **Quotas**: search ~100/day (personal) shared with attraction search; LBS quota unaffected (no route API).
 - **Client lifecycle & caching**: reuse the single `AmapClient`; add a hotel cache keyed by `adcode + normalizedFilters` with TTL = `cacheTtlMs` (default 24h). Never instantiate per request.
 - **Retry**: no retry loop; a single 3000 ms `AbortController` timeout; failures map to the taxonomy.
@@ -186,10 +191,11 @@ Reviewed against `openspec/changes/hotel-route-search-redesign/specs/attraction-
 
 | AC | Design coverage |
 | :-- | :-- |
-| AC1–AC4 (contract, filters, validation) | §3 Interface Contracts + error contract; §6.1 validation |
+| AC1–AC4 (contract, filters, validation incl. integer bounds) | §3 Interface Contracts + error contract; §6.1 validation |
 | AC5–AC7 (page sections, responsive/alt, attribution) | §5.2 tokens, §5.3 layout + attribution, §5.4 states |
-| AC8–AC10 (hotel model, star/price filters) | §3 `Hotel`; §4 data mapping + filter semantics |
-| AC11–AC14 (route, legs, nearest-neighbor, no-hotel) | §2 route step; §3 `RouteLeg`/`DayRoute`; §7 offline routing |
+| AC8–AC10, AC15–AC16 (hotel model, min-star/price, zero-hotels, failure) | §3 `Hotel`; §4 data mapping, filter semantics, ranking, error taxonomy |
+| AC11–AC14, AC17 (route, legs w/ ids + duration formula, nearest-neighbor, no-hotel, zero-stop) | §2 route step; §3 `RouteLeg`/`DayRoute`; §7 offline routing |
+| AC18 (hotel/route localization + parity) | §5.3 localization; `src/i18n.ts` catalog parity |
 
 ## 8. Migration, Rollout & Rollback
 - No database or data migration. Deploy is a normal release.
