@@ -3,111 +3,76 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>wayfare-trip — weather-aware attraction recommendations</title>
+    <title>wayfare-trip — weather-aware trip planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet" />
     <style>
-      :root {
-        --bg: #0f172a;
-        --ink: #0b1220;
-        --muted: #5b6b82;
-        --card: #ffffff;
-        --accent: #0ea5a4;
-        --accent-2: #f59e0b;
-        --line: #e5e9f0;
-        --radius: 18px;
-        color-scheme: light;
-      }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: "Segoe UI", system-ui, -apple-system, Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-        color: var(--ink);
-        background: #f6f8fb;
-        line-height: 1.55;
-      }
-      .hero {
-        position: relative;
-        padding: 4.5rem 1rem 3.5rem;
-        background:
-          radial-gradient(1200px 400px at 20% -10%, #0ea5a455, transparent),
-          radial-gradient(900px 400px at 100% 0%, #f59e0b44, transparent),
-          linear-gradient(160deg, #0f172a, #12233d 60%, #0b1220);
-        color: #fff;
-        text-align: center;
-      }
-      .hero h1 { font-size: clamp(1.6rem, 4vw, 2.6rem); margin: 0 0 0.4rem; letter-spacing: -0.02em; }
-      .hero p { margin: 0 auto 1.6rem; max-width: 42rem; color: #c8d3e2; }
-      .search {
-        display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center;
-        max-width: 720px; margin: 0 auto;
-      }
-      .search input, .search select, .search button {
-        font: inherit; padding: 0.75rem 0.9rem; border-radius: 12px; border: 1px solid #ffffff22;
-      }
-      .search input { flex: 1 1 240px; min-width: 0; background: #ffffff; color: var(--ink); }
-      .search input[type="number"] { flex: 0 0 6rem; }
-      .search select { background: #ffffff; color: var(--ink); }
-      .search button {
-        background: linear-gradient(135deg, var(--accent), #22c55e);
-        color: #05221f; font-weight: 700; cursor: pointer; border: none;
-      }
-      main { max-width: 1080px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
-      .weather-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin: 1rem 0 1.5rem; }
-      .weather {
-        background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-        padding: 0.9rem 1rem; box-shadow: 0 8px 24px #0f172a0d;
-      }
-      .weather h3 { margin: 0 0 0.2rem; font-size: 0.9rem; color: var(--muted); font-weight: 600; }
-      .weather .temp { font-size: 1.25rem; font-weight: 700; }
-      .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
-      .day-list { display: block; }
-      .day-group { margin: 0 0 1.6rem; }
-      .day-head { font-size: 1.02rem; margin: 0 0 0.25rem; }
-      .day-group .summary { margin: 0 0 0.7rem; }
-      .card {
-        background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-        overflow: hidden; box-shadow: 0 10px 30px #0f172a0f; display: flex; flex-direction: column;
-      }
-      .card img { width: 100%; height: 150px; object-fit: cover; background: #dbe3ee; display: block; }
-      .card .body { padding: 0.9rem 1rem 1.1rem; }
-      .card h3 { margin: 0 0 0.25rem; font-size: 1.05rem; }
-      .card .reason { color: var(--accent); font-weight: 600; font-size: 0.9rem; margin: 0 0 0.4rem; }
-      .card .intro { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.5rem; }
-      .tag { display: inline-block; font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: #eef6f6; color: #0b6b6a; }
-      .itinerary { margin-top: 1.6rem; }
-      .section-title { font-size: 1.05rem; margin: 1.6rem 0 0.6rem; color: var(--ink); }
-      .card-ph {
-        height: 150px; display: flex; align-items: center; justify-content: center;
-        font-size: 2rem; font-weight: 700; color: #fff;
-        background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      }
-      .day-panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.1rem; margin-bottom: 1rem; }
-      .day-panel h3 { margin: 0 0 0.3rem; }
-      .day-panel .advice { color: var(--muted); margin: 0 0 0.6rem; }
-      .slots { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
-      .slots li { display: flex; gap: 0.6rem; align-items: baseline; }
-      .slots .slot { min-width: 5.5rem; color: var(--accent); font-weight: 700; font-size: 0.85rem; }
-      .notice { background: #fff7e6; border: 1px solid #f59e0b55; border-radius: 12px; padding: 0.6rem 0.8rem; margin: 0 0 1rem; }
-      .error { color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 0.7rem 0.9rem; }
-      .attribution { color: var(--muted); font-size: 0.78rem; text-align: center; margin-top: 2.5rem; }
-      .summary { color: var(--muted); margin: 0.2rem 0 0.6rem; }
-      .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-      @media (max-width: 768px) {
-        .hero { padding: 3rem 1rem 2.5rem; }
-        .cards { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
-      }
-      @media (max-width: 420px) {
-        .search { flex-direction: column; align-items: stretch; }
-        .search input[type="number"] { flex: 1 1 auto; }
-      }
-      @media (min-width: 1280px) {
-        main { max-width: 1200px; }
-      }
+      :root{--bg:#f6f8fb;--surface:#fff;--border:#e5e9f0;--primary:#0e7490;--accent:#f59e0b;--ink:#0b1220;--muted:#5b6b82;--radius:18px;color-scheme:light}
+      *{box-sizing:border-box}
+      body{margin:0;font-family:"Source Sans 3",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);line-height:1.55}
+      h1,h2,h3{font-family:"Fraunces",Georgia,"Times New Roman",serif;letter-spacing:-0.02em}
+      .hero{padding:4.5rem 1rem 3rem;background:radial-gradient(1200px 400px at 20% -10%,#0ea5a455,transparent),radial-gradient(900px 400px at 100% 0%,#f59e0b44,transparent),linear-gradient(160deg,#0f172a,#12233d 60%,#0b1220);color:#fff;text-align:center}
+      .hero h1{font-size:clamp(1.7rem,4vw,2.7rem);margin:0 0 .4rem}
+      .hero p{margin:0 auto 1.6rem;max-width:44rem;color:#c8d3e2}
+      .search{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center;max-width:880px;margin:0 auto}
+      .search input,.search select,.search button{font:inherit;padding:.72rem .9rem;border-radius:12px;border:1px solid #ffffff22}
+      .search input,.search select{background:#fff;color:var(--ink)}
+      .search input#city{flex:1 1 240px;min-width:0}
+      .search input[type=number]{width:6rem}
+      .btn-primary{background:linear-gradient(135deg,var(--primary),#22c55e);color:#04211d;font-weight:700;cursor:pointer;border:none}
+      .btn-ghost{background:transparent;color:#dbe6f3;border:1px solid #ffffff44;cursor:pointer}
+      .hotel-prefs{flex:1 1 100%;text-align:left;background:#ffffff10;border:1px solid #ffffff22;border-radius:14px;padding:.5rem .9rem}
+      .hotel-prefs summary{cursor:pointer;font-weight:600;color:#e8eef7}
+      .prefs-row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-top:.6rem}
+      .chips{display:flex;gap:.35rem;flex-wrap:wrap}
+      .chip{font:inherit;font-size:.85rem;padding:.3rem .65rem;border-radius:999px;border:1px solid #ffffff33;background:#ffffff12;color:#e8eef7;cursor:pointer}
+      .chip[aria-pressed=true]{background:var(--accent);color:#2a1a00;border-color:transparent;font-weight:700}
+      .prefs-row label{font-size:.85rem;color:#cdd8e6;display:flex;align-items:center;gap:.35rem}
+      .prefs-row input{width:5.5rem}
+      main{max-width:1080px;margin:0 auto;padding:1.5rem 1rem 4rem}
+      .section-title{font-size:1.2rem;margin:1.8rem 0 .7rem}
+      .summary{color:var(--muted);margin:.2rem 0 .6rem}
+      .weather-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin:1rem 0 1.5rem}
+      .weather,.hotel,.day-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px #0f172a0d}
+      .weather{padding:.9rem 1rem}.weather h3{margin:0 0 .2rem;font-size:.9rem;color:var(--muted)}.weather .temp{font-size:1.2rem;font-weight:700}
+      .hotels{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem}
+      .hotel{overflow:hidden;display:flex;flex-direction:column}
+      .hotel img,.hotel .ph{width:100%;height:140px;object-fit:cover;background:#dbe3ee;display:block}
+      .hotel .ph{display:flex;align-items:center;justify-content:center;font-size:1.8rem;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--primary),var(--accent))}
+      .hotel .body{padding:.85rem 1rem 1rem}.hotel h3{margin:0 0 .2rem;font-size:1.05rem}
+      .hotel .meta{color:var(--muted);font-size:.88rem;margin:0 0 .35rem}
+      .badge{display:inline-block;font-size:.72rem;font-weight:700;color:#2a1a00;background:var(--accent);border-radius:999px;padding:.05rem .5rem;margin-left:.35rem}
+      .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
+      .day-list{display:block}.day-group{margin:0 0 1.6rem}.day-head{font-size:1.02rem;margin:0 0 .25rem}
+      .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;box-shadow:0 10px 30px #0f172a0f}
+      .card img,.card .card-ph{width:100%;height:150px;object-fit:cover;background:#dbe3ee;display:block}
+      .card .card-ph{display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--primary),var(--accent))}
+      .card .body{padding:.9rem 1rem 1.1rem}.card h3{margin:0 0 .25rem;font-size:1.02rem}
+      .card .reason{color:var(--primary);font-weight:600;font-size:.88rem;margin:0 0 .4rem}
+      .card .intro{color:var(--muted);font-size:.88rem;margin:0 0 .4rem}
+      .tag{display:inline-block;font-size:.72rem;padding:.05rem .5rem;border-radius:999px;background:#eef6f6;color:#0b6b6a}
+      .day-panel{padding:1rem 1.1rem;margin-bottom:1rem}.day-panel h3{margin:0 0 .3rem}
+      .slots,.legs{list-style:none;padding:0;margin:0;display:grid;gap:.35rem}
+      .slots li,.legs li{display:flex;gap:.6rem;align-items:baseline;font-size:.9rem}
+      .slots .slot{min-width:5.5rem;color:var(--primary);font-weight:700;font-size:.82rem}
+      .legs .leg-mode{min-width:3.5rem;color:var(--primary);font-weight:700;font-size:.8rem}
+      .notice{background:#fff7e6;border:1px solid #f59e0b55;border-radius:12px;padding:.6rem .8rem;margin:0 0 1rem}
+      .error{color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:.7rem .9rem}
+      .skeleton{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem;margin:1rem 0}
+      .skeleton .sk{height:160px;border-radius:var(--radius);background:linear-gradient(90deg,#e9eef5 25%,#f4f7fb 37%,#e9eef5 63%);background-size:400% 100%;animation:shimmer 1.4s ease infinite}
+      @keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+      .attribution{color:var(--muted);font-size:.78rem;text-align:center;margin-top:2.5rem}
+      .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+      @media (max-width:640px){.hero{padding:3rem 1rem 2.4rem}.cards,.hotels{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}}
+      @media (min-width:641px) and (max-width:1024px){main{max-width:900px}}
+      @media (min-width:1025px){main{max-width:1180px}}
     </style>
   </head>
   <body>
     <header class="hero" id="hero">
-      <h1 id="app-title">Weather-aware attraction recommendations</h1>
-      <p id="app-subtitle">Enter a Chinese city (Chinese or pinyin). Rainy days favour indoor spots; hot days avoid midday outdoors.</p>
+      <h1 id="app-title">Weather-aware trip planner</h1>
+      <p id="app-subtitle">Enter a Chinese city (Chinese or pinyin). Add hotel preferences if you like.</p>
       <form class="search" id="form" role="search">
         <label class="sr-only" for="city">City</label>
         <input id="city" name="city" placeholder="Beijing / 北京 / beijing" autocomplete="off" />
@@ -118,12 +83,33 @@
           <option value="en">English</option>
           <option value="zh-CN">中文</option>
         </select>
-        <button id="submit" type="submit">Recommend</button>
+        <details class="hotel-prefs" id="hotel-prefs">
+          <summary id="prefs-summary">Hotel preferences (optional)</summary>
+          <div class="prefs-row">
+            <div class="chips" id="star-chips" role="group" aria-label="Hotel star">
+              <button type="button" class="chip" data-star="" aria-pressed="true">Any</button>
+              <button type="button" class="chip" data-star="3" aria-pressed="false">3★+</button>
+              <button type="button" class="chip" data-star="4" aria-pressed="false">4★+</button>
+              <button type="button" class="chip" data-star="5" aria-pressed="false">5★+</button>
+            </div>
+            <label>Price min <input id="priceMin" type="number" min="0" step="1" /></label>
+            <label>Price max <input id="priceMax" type="number" min="0" step="1" /></label>
+          </div>
+        </details>
+        <button id="submit" class="btn-primary" type="submit">Search</button>
+        <button id="clear" class="btn-ghost" type="button">Clear</button>
       </form>
     </header>
 
     <main>
       <p id="summary" class="summary"></p>
+      <div id="loading" class="skeleton" hidden aria-hidden="true">
+        <div class="sk"></div><div class="sk"></div><div class="sk"></div>
+      </div>
+      <div id="error" class="error" hidden role="alert"></div>
+
+      <h2 id="hotels-title" class="section-title">Hotels</h2>
+      <section id="hotels" class="hotels" aria-label="hotels"></section>
 
       <h2 id="plan-title" class="section-title">Trip plan</h2>
       <section id="itinerary" class="itinerary" aria-label="trip itinerary"></section>
@@ -131,6 +117,9 @@
       <h2 id="days-title" class="section-title">Daily status</h2>
       <div id="weather" class="weather-strip" aria-label="weather forecast"></div>
       <div id="cards" class="day-list" aria-label="attractions"></div>
+
+      <h2 id="routes-title" class="section-title">Routes</h2>
+      <section id="routes" class="routes" aria-label="daily routes"></section>
 
       <p class="attribution" id="attribution">Photos © Amap (高德). Weather data © Open-Meteo.</p>
     </main>

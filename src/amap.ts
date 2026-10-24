@@ -79,10 +79,78 @@ function toAttraction(poi: any, rank: number): Attraction {
   };
 }
 
+export interface HotelPoi {
+  id: string;
+  nameZh: string;
+  typecode: string;
+  star?: number;
+  price?: number;
+  rating?: number;
+  address?: string;
+  image: string | null;
+  lat: number;
+  lon: number;
+}
+
+/** Amap hotel typecode -> star level (minimum-filter basis). */
+export function hotelStarFromTypecode(typecode: string): number | undefined {
+  switch (typecode) {
+    case "100101": // luxury
+    case "100102": // five-star
+      return 5;
+    case "100103":
+      return 4;
+    case "100104":
+      return 3;
+    case "100105": // economy chain
+      return 2;
+    default:
+      return undefined;
+  }
+}
+
+/** Fallback: derive star from the human-readable Amap type string. */
+export function hotelStarFromType(typeStr: string): number | undefined {
+  if (!typeStr) return undefined;
+  if (typeStr.includes("五星") || typeStr.includes("奢华")) return 5;
+  if (typeStr.includes("四星")) return 4;
+  if (typeStr.includes("三星")) return 3;
+  if (typeStr.includes("经济")) return 2;
+  return undefined;
+}
+
+function toHotelPoi(poi: any): HotelPoi {
+  const loc = String(poi?.location ?? "");
+  const [lngStr, latStr] = loc.split(",");
+  const typecode = String(poi?.typecode ?? "");
+  const photos = Array.isArray(poi?.photos) ? poi.photos : [];
+  const image =
+    photos.map((p: any) => String(p?.url ?? "")).find((u: string) => u.startsWith("https://")) ?? null;
+  const priceRaw = poi?.biz_ext?.cost;
+  const ratingRaw = poi?.biz_ext?.rating;
+  const priceNum = priceRaw !== undefined && priceRaw !== "" ? Number(priceRaw) : NaN;
+  const rating = ratingRaw !== undefined && ratingRaw !== "" ? Number(ratingRaw) : undefined;
+  return {
+    id: String(poi?.id ?? ""),
+    nameZh: String(poi?.name ?? ""),
+    typecode,
+    star: hotelStarFromTypecode(typecode) ?? hotelStarFromType(String(poi?.type ?? "")),
+    // Amap returns "0" when cost is unknown -> treat non-positive as unknown.
+    price: Number.isFinite(priceNum) && priceNum > 0 ? priceNum : undefined,
+    rating: Number.isFinite(rating) ? rating : undefined,
+    address: poi?.address ? String(poi.address) : undefined,
+    image,
+    lat: Number(latStr) || 0,
+    lon: Number(lngStr) || 0,
+  };
+}
+
 export class AmapClient {
   private readonly cache = new Map<string, { value: Attraction[]; expires: number }>();
   private readonly inflight = new Map<string, Promise<Attraction[]>>();
   private readonly adcodeCache = new Map<string, { value: string; expires: number }>();
+  private readonly hotelCache = new Map<string, { value: HotelPoi[]; expires: number }>();
+  private readonly hotelInflight = new Map<string, Promise<HotelPoi[]>>();
 
   constructor(
     private readonly fetchImpl: FetchLike,
@@ -128,6 +196,45 @@ export class AmapClient {
     );
     this.inflight.set(adcode, promise);
     return promise;
+  }
+
+  /** Hotel POIs for a city (types=100000), cached per adcode. */
+  async hotels(adcode: string): Promise<HotelPoi[]> {
+    const cached = this.hotelCache.get(adcode);
+    if (cached && cached.expires > Date.now()) return cached.value;
+
+    const existing = this.hotelInflight.get(adcode);
+    if (existing) return existing;
+
+    const promise = this.fetchHotels(adcode).finally(() => this.hotelInflight.delete(adcode));
+    this.hotelInflight.set(adcode, promise);
+    return promise;
+  }
+
+  private async fetchHotels(adcode: string): Promise<HotelPoi[]> {
+    const url =
+      "https://restapi.amap.com/v3/place/text" +
+      `?key=${encodeURIComponent(this.key)}` +
+      `&types=100000&city=${encodeURIComponent(adcode)}&citylimit=true` +
+      `&offset=25&page=1&extensions=all`;
+    let data: any;
+    try {
+      data = await getJson(this.fetchImpl, url, this.cfg.timeoutMs);
+    } catch (err) {
+      logUpstreamError("attraction_source_unavailable", err);
+      throw AppError.attractionSourceUnavailable();
+    }
+    if (data?.status !== "1") {
+      logUpstreamError(
+        "attraction_source_unavailable",
+        `hotel status=${data?.status} infocode=${data?.infocode}`,
+      );
+      throw AppError.attractionSourceUnavailable();
+    }
+    const pois = Array.isArray(data.pois) ? data.pois : [];
+    const hotels = pois.filter((p: any) => p && p.id).map((p: any) => toHotelPoi(p));
+    this.hotelCache.set(adcode, { value: hotels, expires: Date.now() + this.cfg.cacheTtlMs });
+    return hotels;
   }
 
   private async fetchAttractions(adcode: string): Promise<Attraction[]> {

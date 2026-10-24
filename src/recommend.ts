@@ -7,16 +7,23 @@ import { dayAdvice, isHotDay, isRainyDay } from "./advice.js";
 import { DEFAULT_LANG, t, weatherText, type Lang } from "./i18n.js";
 import { rankForDay } from "./rank.js";
 import { buildItinerary } from "./itinerary.js";
+import { filterAndRankHotels } from "./hotels.js";
+import { buildRoute } from "./route.js";
 import { AppError } from "./errors.js";
 import type {
   Attraction,
   DayRecommendation,
+  DayRoute,
   ForecastDay,
+  HotelFilters,
   Recommendation,
 } from "./types.js";
 
 export const NO_ATTRACTION_NOTICE =
   "No attraction data is available for this city yet.";
+
+const DISPLAY_LIMIT = 5;
+const EMPTY_ROUTE: DayRoute = { legs: [], totalDistanceKm: 0, totalDurationMin: 0 };
 
 export function validateCity(input: string | null | undefined): string {
   const city = (input ?? "").trim();
@@ -36,7 +43,41 @@ export function validateDays(raw: string | null | undefined, cfg: Config): numbe
   return n;
 }
 
-const DISPLAY_LIMIT = 5;
+/** Validate and parse the optional hotel filters from query values. */
+export function parseHotelFilters(
+  star: string | null | undefined,
+  priceMin: string | null | undefined,
+  priceMax: string | null | undefined,
+): HotelFilters {
+  const filters: HotelFilters = {};
+  if (star !== null && star !== undefined && star.trim() !== "") {
+    const n = Number(star);
+    if (!Number.isInteger(n) || ![3, 4, 5].includes(n)) {
+      throw AppError.invalidInput("The 'star' filter must be 3, 4, or 5.");
+    }
+    filters.star = n as 3 | 4 | 5;
+  }
+  const parsePrice = (raw: string, name: string): number => {
+    if (!/^\d+$/.test(raw.trim())) {
+      throw AppError.invalidInput(`'${name}' must be a non-negative integer.`);
+    }
+    return Number(raw);
+  };
+  if (priceMin !== null && priceMin !== undefined && priceMin.trim() !== "") {
+    filters.priceMin = parsePrice(priceMin, "priceMin");
+  }
+  if (priceMax !== null && priceMax !== undefined && priceMax.trim() !== "") {
+    filters.priceMax = parsePrice(priceMax, "priceMax");
+  }
+  if (
+    filters.priceMin !== undefined &&
+    filters.priceMax !== undefined &&
+    filters.priceMin > filters.priceMax
+  ) {
+    throw AppError.invalidInput("'priceMin' must be less than or equal to 'priceMax'.");
+  }
+  return filters;
+}
 
 function makeDay(
   day: ForecastDay,
@@ -58,6 +99,7 @@ function makeDay(
     advice: dayAdvice(day, rain, hot, cfg, lang),
     attractions: ranked,
     itinerary: buildItinerary(ranked, { rain, hot }, lang),
+    route: { ...EMPTY_ROUTE },
   };
 }
 
@@ -85,13 +127,13 @@ export async function recommend(
   days?: number,
   amap?: AmapClient,
   lang: Lang = DEFAULT_LANG,
+  filters: HotelFilters = {},
 ): Promise<Recommendation> {
   const cityInput = validateCity(rawCity);
   const horizon = days ?? cfg.forecastDays;
 
   const city = await resolveCity(cityInput, cfg, fetchImpl);
 
-  // Reuse a long-lived client (with its TTL cache) when the caller provides one.
   const client = amap ?? new AmapClient(fetchImpl, cfg.amapKey, cfg);
   const attractions = await client.attractions(city.adcode);
 
@@ -102,9 +144,6 @@ export async function recommend(
     fetchImpl,
     cfg.timeoutMs,
   );
-
-  const notices: string[] = [];
-  if (attractions.length === 0) notices.push(t(lang, "notice.no_attraction_data"));
 
   const dayRecs: DayRecommendation[] = [];
   const used = new Set<string>();
@@ -117,8 +156,7 @@ export async function recommend(
     let pool = attractions.filter((a) => !used.has(a.id));
     if (pool.length === 0) pool = attractions;
 
-    // Keep rainy-day indoor-first meaningful even late in a trip: if the unseen
-    // pool has no indoor/mixed option, bring sheltered POIs back into the pool.
+    // Keep rainy-day indoor-first meaningful even late in a trip.
     if (rain) {
       const shelteredFresh = pool.filter((a) => a.environment !== "outdoor");
       if (shelteredFresh.length === 0) {
@@ -132,6 +170,28 @@ export async function recommend(
     for (const a of ranked.slice(0, DISPLAY_LIMIT)) used.add(a.id);
     dayRecs.push(makeDay(day, ranked, rain, hot, cfg, lang));
   }
+
+  // Hotel recommendations: centroid of all itinerary stops (fallback: city).
+  const stops = dayRecs.flatMap((d) => d.itinerary);
+  const centroid = stops.length
+    ? {
+        lat: stops.reduce((s, x) => s + x.lat, 0) / stops.length,
+        lon: stops.reduce((s, x) => s + x.lon, 0) / stops.length,
+      }
+    : { lat: city.lat, lon: city.lon };
+
+  const hotelPois = await client.hotels(city.adcode);
+  const hotels = filterAndRankHotels(hotelPois, filters, centroid, lang);
+  const primary = hotels[0] ?? null;
+
+  const notices: string[] = [];
+  if (attractions.length === 0) notices.push(t(lang, "notice.no_attraction_data"));
+  if (hotels.length === 0) notices.push(t(lang, "notice.no_hotel_data"));
+
+  for (const d of dayRecs) {
+    d.route = buildRoute(primary, d.itinerary);
+  }
+
   const summary = buildSummary(city, dayRecs, notices, lang);
 
   return {
@@ -143,6 +203,8 @@ export async function recommend(
       lat: city.lat,
       lon: city.lon,
     },
+    hotels,
+    hotelFilters: filters,
     days: dayRecs,
     summary,
     notices,

@@ -110,12 +110,55 @@ export function weatherBody(
   };
 }
 
+export const hotelPoisBody = {
+  status: "1",
+  count: "4",
+  pois: [
+    {
+      id: "H5",
+      name: "豪华五星酒店",
+      typecode: "100102",
+      location: "116.4,39.92",
+      address: "北京市朝阳区A路1号",
+      biz_ext: { rating: "4.9", cost: "800" },
+      photos: [{ url: "https://store.is.autonavi.com/h5.jpg" }],
+    },
+    {
+      id: "H4",
+      name: "四星商务酒店",
+      typecode: "100103",
+      location: "116.41,39.93",
+      address: "北京市朝阳区B路2号",
+      biz_ext: { rating: "4.5", cost: "400" },
+    },
+    {
+      id: "H2",
+      name: "经济连锁酒店",
+      typecode: "100105",
+      location: "116.42,39.94",
+      address: "北京市朝阳区C路3号",
+      biz_ext: { rating: "4.0", cost: "150" },
+    },
+    {
+      id: "HX",
+      name: "无星级旅店",
+      typecode: "100200",
+      location: "116.43,39.95",
+      address: "北京市朝阳区D路4号",
+      biz_ext: { rating: "3.5", cost: "100" },
+    },
+  ],
+};
+
 /** Full happy-path route set (7-day forecast by default). */
 export function happyRoutes(weather: unknown = weatherBody(7)): Route[] {
   return [
     { match: GEO, respond: () => beijingGeo },
     { match: AMAP_REGEO, respond: () => regeoBody },
-    { match: AMAP_TEXT, respond: () => poisBody },
+    {
+      match: AMAP_TEXT,
+      respond: (url) => (url.includes("types=100000") ? hotelPoisBody : poisBody),
+    },
     { match: WEATHER, respond: () => weather },
   ];
 }

@@ -76,5 +76,7 @@ export function rankForDay(
     reason: reasonFor(lang, a, opts),
     introduction: introductionFor(lang, a),
     image: a.photo && a.photo.startsWith("https://") ? a.photo : null,
+    lat: a.lat,
+    lon: a.lon,
   }));
 }

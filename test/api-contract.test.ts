@@ -57,7 +57,10 @@ describe("http contract", () => {
         expect(String(a.location)).toContain(",");
         expect(Array.isArray(a.advisories)).toBe(true);
       }
+      expect(d.route).toBeDefined();
     }
+    expect(Array.isArray(body.hotels)).toBe(true);
+    expect(typeof body.hotelFilters).toBe("object");
   });
 
   it("AC23: invalid input returns 400 invalid_input with {error_code, message}", async () => {
@@ -80,10 +83,27 @@ describe("http contract", () => {
     }
   });
 
+  it("AC3/AC4: filters accepted + echoed; invalid filters rejected", async () => {
+    const base = await start();
+    const ok = await fetch(
+      `${base}/api/recommend?city=Beijing&days=7&star=4&priceMin=200&priceMax=800`,
+    );
+    expect(ok.status).toBe(200);
+    const body: any = await ok.json();
+    expect(body.hotelFilters).toEqual({ star: 4, priceMin: 200, priceMax: 800 });
+
+    for (const q of ["star=6", "priceMin=-1", "priceMin=200.5", "priceMin=900&priceMax=100"]) {
+      const res = await fetch(`${base}/api/recommend?city=Beijing&days=7&${q}`);
+      expect(res.status).toBe(400);
+      expect((await res.json()).error_code).toBe("invalid_input");
+    }
+  });
+
   it("AC8 (production path): repeated requests reuse the per-city Amap cache", async () => {
     const base = await start();
     await fetch(`${base}/api/recommend?city=Beijing&days=7`);
     await fetch(`${base}/api/recommend?city=Beijing&days=7`);
-    expect(mock!.count("place/text")).toBe(1);
+    // One attraction search + one hotel search on the first request; both cached after.
+    expect(mock!.count("place/text")).toBe(2);
   });
 });

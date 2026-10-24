@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, normalize, extname, relative, isAbsolute } from "node:path";
 import { loadConfig, type Config } from "./config.js";
 import { httpFetch, type FetchLike } from "./http.js";
-import { recommend, validateDays } from "./recommend.js";
+import { recommend, validateDays, parseHotelFilters } from "./recommend.js";
 import { AmapClient } from "./amap.js";
 import { AppError } from "./errors.js";
 import { resolveLang } from "./i18n.js";
@@ -66,7 +66,12 @@ export function createApp(
             url.searchParams.get("lang"),
             (req.headers["accept-language"] as string | undefined) ?? null,
           );
-          sendJson(res, 200, await recommend(city, cfg, fetchImpl, days, amap, lang));
+          const filters = parseHotelFilters(
+            url.searchParams.get("star"),
+            url.searchParams.get("priceMin"),
+            url.searchParams.get("priceMax"),
+          );
+          sendJson(res, 200, await recommend(city, cfg, fetchImpl, days, amap, lang, filters));
           return;
         }
         await serveStatic(url.pathname, res);

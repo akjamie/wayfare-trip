@@ -42,6 +42,8 @@ export function buildItinerary(
       id: candidate.id,
       name_zh: candidate.name_zh,
       environment: candidate.environment,
+      lat: candidate.lat,
+      lon: candidate.lon,
     });
   }
 
