@@ -63,6 +63,10 @@
 
 - **Unknown star level** → excluded when a `star` filter is set (mirrors the unknown-cost exclusion).
 
+- **Unverified assumption** → `[UNVERIFIED: biz_ext.cost coverage varies by POI across Amap data]`. Fallback: when a price bound is set, hotels with unknown cost are excluded; otherwise kept with `price: undefined`. Flagged for TL sign-off (surfaced by spec-review D7).
+
+- **Visual ACs / test harness** → UI visual ACs (breakpoints + loading/empty/error/active states) are asserted via the routed web smoke test on served markup/JS hooks; this repo has no browser/screenshot (Playwright) harness.
+
 ## Open questions
 <!-- must be empty before the spec is written -->
 (none)

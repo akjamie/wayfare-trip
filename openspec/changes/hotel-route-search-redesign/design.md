@@ -162,6 +162,8 @@ Spacing & radii: `--radius: 18px`; `--spacing-unit: 8px`.
 4. **Empty**: when no hotels → empathetic localized notice + "adjust preferences" hint; no attractions → existing notice.
 5. **Error**: inline non-blocking banner with the localized `message` and a retry affordance; upstream failure does not blank the page.
 
+These states plus the mobile/tablet/desktop breakpoints are the spec's visual ACs (AC6, AC19), asserted via `test/web-smoke.test.ts` on served markup/JS hooks (no browser/screenshot harness exists in this repo).
+
 Anti-AI-slop: no arbitrary purple-on-black, no gradient text on single words, no uniform pill buttons; the hotel **primary** uses the accent chip while secondary actions stay quiet; layout rhythm varies (atmospheric hero → asymmetric primary-hotel panel → card grid → route list) instead of a monotonous 3-card grid.
 - Micro-motion: 150–250 ms `cubic-bezier(0.22, 1, 0.36, 1)` (ease-out); never sluggish.
 - Accessibility: every control is Tab-reachable with a visible `:focus-visible` ring; images carry `alt`; icon-only controls carry `aria-label`; hotel star/price filter chips expose their selected state (`aria-pressed`).

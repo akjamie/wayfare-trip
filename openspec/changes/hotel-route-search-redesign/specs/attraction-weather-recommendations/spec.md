@@ -36,7 +36,7 @@ _Story: hotel-route-search-redesign_
 - [ ] AC4: `star` not in {3,4,5}, a non-integer or negative price (e.g. `200.5` or `-1`), or `priceMin > priceMax` returns `400 invalid_input`. (test: test/api-contract.test.ts)
 
 ### Requirement: Tourism-style responsive website
-The system SHALL serve a tourism-style page comprising a hero/search area (with optional hotel star/price preference controls), a language toggle, a weather forecast strip, attraction cards (each with an image and a short reason), a hotel recommendations section, the day-by-day itinerary, and per-day route sections; the page SHALL declare a responsive viewport, define responsive breakpoints, avoid horizontal overflow, give every image a non-empty `alt`, and display Amap photo attribution.
+The system SHALL serve a tourism-style page comprising a hero/search area (with optional hotel star/price preference controls), a language toggle, a weather forecast strip, attraction cards (each with an image and a short reason), a hotel recommendations section, the day-by-day itinerary, and per-day route sections; the page SHALL declare a responsive viewport, define mobile (≤640px), tablet (641–1024px), and desktop (>1024px) breakpoints, avoid horizontal overflow, give every image a non-empty `alt`, display Amap photo attribution, and define loading (skeleton/spinner), empty (no hotels / no attractions), error (inline banner + retry), and active-filter states.
 _Story: hotel-route-search-redesign_
 
 #### Scenario: Required sections are present
@@ -54,10 +54,16 @@ _Story: hotel-route-search-redesign_
 - **WHEN** the page renders the result
 - **THEN** the hotel section shows the primary hotel and its alternatives, and each day displays its route
 
+#### Scenario: Interaction states are defined
+- **GIVEN** the served page and its client script
+- **WHEN** the UI is inspected
+- **THEN** it provides loading (skeleton/spinner), empty (no hotels / no attractions), and error (inline banner with retry) states, and the hotel filter controls expose an active state
+
 **Acceptance criteria**
 - [ ] AC5: The served page contains the hero/search (with hotel preference controls), language toggle, weather strip, attraction cards, hotel section, itinerary, and route sections. (test: test/web-smoke.test.ts)
-- [ ] AC6: The page declares a responsive viewport (`<meta name="viewport">`), its CSS defines breakpoints, and every image has a non-empty `alt`. (test: test/web-smoke.test.ts)
+- [ ] AC6: The page declares a responsive viewport (`<meta name="viewport">`), its CSS defines mobile (≤640px), tablet (641–1024px), and desktop (>1024px) breakpoints, and every image has a non-empty `alt`. (test: test/web-smoke.test.ts)
 - [ ] AC7: The page displays Amap photo attribution. (test: test/web-smoke.test.ts)
+- [ ] AC19: The UI defines loading (skeleton/spinner), empty (no hotels / no attractions), and error (inline banner + retry) states, and hotel filter controls expose an active state (`aria-pressed`), asserted in the served markup/JS. (test: test/web-smoke.test.ts)
 
 ## ADDED Requirements
 
@@ -163,7 +169,7 @@ _Story: hotel-route-search-redesign_
 - **Unit tests** (vitest) cover hotel filtering/ranking (minimum-star, price/unknown/edge cases), the nearest-neighbor route + haversine + duration + mode, zero-stop/zero-hotel cases, hotel-failure mapping, and filter validation — mapped 1:1 to AC1–AC18.
 - **Integration tests** run the HTTP endpoint against a mocked Amap + Open-Meteo transport with and without hotel filters, asserting `hotelFilters`, `hotels[]`, and `days[].route`.
 - **Contract tests** assert the extended schema and the new `400 invalid_input` paths.
-- **Web smoke test** asserts the hotel preference controls, hotel section, and route sections are present.
+- **Web smoke test** asserts the hotel preference controls, hotel section, route sections, responsive breakpoints (mobile/tablet/desktop), and the presence of loading/empty/error/active state hooks in the served markup/JS (visual ACs; no browser/screenshot harness in this repo).
 - **No live routing calls** — routes are local and deterministic.
 
 <!-- IMMUTABLE once approved (PR merged). Execution state belongs in tasks.md. -->
