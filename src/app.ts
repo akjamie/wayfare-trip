@@ -21,7 +21,11 @@ const CONTENT_TYPES: Record<string, string> = {
 
 export function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
-  res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
+  res.writeHead(status, {
+    "content-type": "application/json; charset=utf-8",
+    // Never cache API responses: a stale cached plan would hide new fields (e.g. hotels).
+    "cache-control": "no-store",
+  });
   res.end(payload);
 }
 

@@ -41,7 +41,7 @@ const UI = {
   },
 };
 
-const MAX_CARDS = 5;
+const MAX_CARDS = 3;
 const $ = (id) => document.getElementById(id);
 const form = $("form");
 const cityInput = $("city");

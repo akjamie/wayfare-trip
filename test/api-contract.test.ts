@@ -29,6 +29,7 @@ describe("http contract", () => {
     const base = await start();
     const res = await fetch(`${base}/api/recommend?city=Beijing&days=7`);
     expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toContain("no-store");
     const body: any = await res.json();
 
     expect(body.city).toMatchObject({ name: expect.any(String), admin1: expect.any(String) });

@@ -66,6 +66,8 @@ describe("website smoke", () => {
     expect(html).toContain('id="error"');
     expect(html).toContain("skeleton");
     expect(html).toContain("aria-pressed");
+    // hidden must actually hide (a bare `display:grid` rule would override [hidden]).
+    expect(html).toContain("[hidden]");
 
     const js = await (await fetch(`${base}/app.js`)).text();
     expect(js).toContain("aria-pressed");

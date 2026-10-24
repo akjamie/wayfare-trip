@@ -22,7 +22,6 @@ import type {
 export const NO_ATTRACTION_NOTICE =
   "No attraction data is available for this city yet.";
 
-const DISPLAY_LIMIT = 5;
 const EMPTY_ROUTE: DayRoute = { legs: [], totalDistanceKm: 0, totalDurationMin: 0 };
 
 export function validateCity(input: string | null | undefined): string {
@@ -167,8 +166,9 @@ export async function recommend(
     }
 
     const ranked = rankForDay(pool, { rain, hot }, cfg, lang);
-    for (const a of ranked.slice(0, DISPLAY_LIMIT)) used.add(a.id);
-    dayRecs.push(makeDay(day, ranked, rain, hot, cfg, lang));
+    const dayRec = makeDay(day, ranked, rain, hot, cfg, lang);
+    for (const stop of dayRec.itinerary) used.add(stop.id);
+    dayRecs.push(dayRec);
   }
 
   // Hotel recommendations: centroid of all itinerary stops (fallback: city).
@@ -186,7 +186,11 @@ export async function recommend(
 
   const notices: string[] = [];
   if (attractions.length === 0) notices.push(t(lang, "notice.no_attraction_data"));
-  if (hotels.length === 0) notices.push(t(lang, "notice.no_hotel_data"));
+  if (hotels.length === 0) {
+    const hasFilter =
+      filters.star !== undefined || filters.priceMin !== undefined || filters.priceMax !== undefined;
+    notices.push(t(lang, hasFilter ? "notice.no_hotel_match" : "notice.no_hotel_data"));
+  }
 
   for (const d of dayRecs) {
     d.route = buildRoute(primary, d.itinerary);
