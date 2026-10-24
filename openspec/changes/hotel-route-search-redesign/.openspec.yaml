@@ -4,5 +4,5 @@ requirement: "在现有 '天气感知景点推荐' 基础上新增: (1) 重新�
 targetBranch: "main"
 lastPrType: "spec"
 prUrl: "https://github.com/akjamie/wayfare-trip/pull/6"
-specSha: 65e1c36b3fa4d4460a2316eb6b45c746a9a76fc6
+specSha: ce0048793a9deafc6fa8a991c756dbec0ee8d7b5
 status: ready_for_impl
