@@ -1,49 +1,74 @@
 import type { ItineraryStop, RankedAttraction } from "./types.js";
 import { t, type Lang } from "./i18n.js";
+import { haversineKm, type Point } from "./route.js";
 
 const SLOTS = ["morning", "afternoon", "evening"] as const;
+const MAX_STOPS = 3;
+
+function centroid(items: RankedAttraction[]): Point {
+  return {
+    lat: items.reduce((s, a) => s + a.lat, 0) / items.length,
+    lon: items.reduce((s, a) => s + a.lon, 0) / items.length,
+  };
+}
 
 /**
- * Build a day itinerary from the day's ranked attractions.
- *  - rainy day: every stop is indoor or mixed;
- *  - hot day: no outdoor attraction in the midday (afternoon) slot;
- *  - 2–4 stops when available; fewer only when fewer attractions exist.
+ * Build a geographically clustered day itinerary (≤3 stops):
+ *  - rainy day: only indoor/mixed stops;
+ *  - start from the top-ranked seed, then add the nearest remaining stop
+ *    (so a day's stops are close together);
+ *  - hot day: the midday (afternoon) stop must not be outdoor.
  */
 export function buildItinerary(
   ranked: RankedAttraction[],
-  opts: { rain: boolean; hot: boolean },
+  opts: { rain: boolean; hot: boolean; strictIndoor?: boolean },
   lang: Lang,
 ): ItineraryStop[] {
-  let pool = ranked;
-  if (opts.rain) {
-    const indoor = ranked.filter((a) => a.environment !== "outdoor");
-    if (indoor.length > 0) pool = indoor;
-  }
+  if (ranked.length === 0) return [];
 
-  const stops: ItineraryStop[] = [];
-  const used = new Set<string>();
-  const maxStops = Math.min(4, pool.length);
+  // When there are enough indoor/mixed options, keep a strict indoor plan;
+  // otherwise allow outdoor stops (recommend() decides and flags it).
+  const base = opts.strictIndoor
+    ? ranked.filter((a) => a.environment !== "outdoor")
+    : ranked;
 
-  for (const slot of SLOTS) {
-    if (stops.length >= maxStops) break;
-    let candidate = pool.find((a) => !used.has(a.id));
-    if (!candidate) break;
+  const chosen: RankedAttraction[] = [base[0]];
+  const remaining = base.slice(1);
 
-    if (opts.hot && slot === "afternoon" && candidate.environment === "outdoor") {
-      const safe = pool.find((a) => !used.has(a.id) && a.environment !== "outdoor");
-      if (safe) candidate = safe;
-      else continue; // no outdoor in the midday slot on a hot day
+  while (chosen.length < Math.min(MAX_STOPS, base.length) && remaining.length > 0) {
+    const c = centroid(chosen);
+    let best = 0;
+    let bestDist = haversineKm(c, remaining[0]);
+    for (let i = 1; i < remaining.length; i += 1) {
+      const d = haversineKm(c, remaining[i]);
+      if (
+        d < bestDist - 1e-9 ||
+        (Math.abs(d - bestDist) <= 1e-9 && remaining[i].id < remaining[best].id)
+      ) {
+        best = i;
+        bestDist = d;
+      }
     }
-
-    used.add(candidate.id);
-    stops.push({
-      slot,
-      label: t(lang, `slot.${slot}`),
-      id: candidate.id,
-      name_zh: candidate.name_zh,
-      environment: candidate.environment,
-    });
+    chosen.push(remaining.splice(best, 1)[0]);
   }
 
-  return stops;
+  // Hot day: keep the midday (afternoon, index 1) slot free of outdoor.
+  if (opts.hot && chosen.length >= 2 && chosen[1].environment === "outdoor") {
+    const swap = chosen.findIndex((a, i) => i > 1 && a.environment !== "outdoor");
+    if (swap > 0) {
+      const tmp = chosen[1];
+      chosen[1] = chosen[swap];
+      chosen[swap] = tmp;
+    }
+  }
+
+  return chosen.map((a, i) => ({
+    slot: SLOTS[i],
+    label: t(lang, `slot.${SLOTS[i]}`),
+    id: a.id,
+    name_zh: a.name_zh,
+    environment: a.environment,
+    lat: a.lat,
+    lon: a.lon,
+  }));
 }

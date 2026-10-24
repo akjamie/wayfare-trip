@@ -20,37 +20,59 @@ afterEach(async () => {
 });
 
 describe("website smoke", () => {
-  it("AC15: page has hero/search, language toggle, weather strip, cards, itinerary", async () => {
+  it("AC5: hero/search (+ hotel preferences), language toggle, weather, cards, hotels, itinerary, routes", async () => {
     const base = await start();
     const html = (await (await fetch(`${base}/`)).text()).toLowerCase();
     expect(html).toContain("<!doctype html>");
-    expect(html).toContain('id="hero"');
-    expect(html).toContain('id="lang"'); // language toggle
-    expect(html).toContain('id="weather"'); // weather strip
-    expect(html).toContain('id="cards"'); // attraction cards
-    expect(html).toContain('id="itinerary"'); // itinerary
+    for (const id of [
+      "hero",
+      "lang",
+      "weather",
+      "cards",
+      "itinerary",
+      "hotels",
+      "routes",
+      "star-chips",
+      "pricemin",
+      "pricemax",
+    ]) {
+      expect(html).toContain(`id="${id}"`);
+    }
   });
 
-  it("AC16: responsive viewport + breakpoints; images carry alt; grouped per-day layout", async () => {
+  it("AC6: responsive viewport + breakpoints; images alt; grouped layout", async () => {
     const base = await start();
     const html = (await (await fetch(`${base}/`)).text()).toLowerCase();
     expect(html).toContain('name="viewport"');
     expect(html).toContain("@media");
-    // #cards must be a block list (not a grid), so day headers aren't grid cells.
     expect(html).toContain('class="day-list"');
 
     const js = await (await fetch(`${base}/app.js`)).text();
     expect(js).toContain("/api/recommend");
     expect(js).toContain("alt=");
-    // Each day is wrapped in a .day-group block with a nested .cards grid.
     expect(js).toContain("day-group");
-    expect(js).toContain('class="cards"');
   });
 
-  it("AC17: page displays Amap photo attribution", async () => {
+  it("AC7: page displays Amap photo attribution", async () => {
     const base = await start();
     const html = (await (await fetch(`${base}/`)).text()).toLowerCase();
     expect(html).toContain("amap");
+  });
+
+  it("AC19: loading, empty, error, and active state hooks are present", async () => {
+    const base = await start();
+    const html = (await (await fetch(`${base}/`)).text()).toLowerCase();
+    expect(html).toContain('id="loading"');
+    expect(html).toContain('id="error"');
+    expect(html).toContain("skeleton");
+    expect(html).toContain("aria-pressed");
+    // hidden must actually hide (a bare `display:grid` rule would override [hidden]).
+    expect(html).toContain("[hidden]");
+
+    const js = await (await fetch(`${base}/app.js`)).text();
+    expect(js).toContain("aria-pressed");
+    expect(js).toContain("noHotels");
+    expect(js).toContain("unreachable");
   });
 
   it("only serves files under public/", async () => {

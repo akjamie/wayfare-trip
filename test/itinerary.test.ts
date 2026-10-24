@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { recommend } from "../src/recommend.js";
 import { loadConfig } from "../src/config.js";
-import { makeFetch, happyRoutes, weatherBody } from "./helpers.js";
+import { makeFetch, happyRoutes, weatherBody, AMAP_TEXT, hotelPoisBody } from "./helpers.js";
 
 const cfg = { ...loadConfig({} as Record<string, string>, {}), amapKey: "testkey" };
 
@@ -50,15 +50,49 @@ describe("itinerary", () => {
         id: `P${i}`,
         name: `景点${i}`,
         typecode: "140100",
-        location: "116.4,39.9",
+        location: `116.${30 + i},39.${90 + (i % 9)}`,
       })),
     };
     const routes = happyRoutes(weatherBody(3)).map((r) =>
-      r.match === "place/text" ? { ...r, respond: () => manyPois } : r,
+      r.match === AMAP_TEXT
+        ? { ...r, respond: (url: string) => (url.includes("types=100000") ? hotelPoisBody : manyPois) }
+        : r,
     );
     const r = await recommend("Beijing", cfg, makeFetch(routes), 3);
     const ids = r.days.flatMap((d) => d.itinerary.map((s) => s.id));
     expect(ids.length).toBeGreaterThan(0);
     expect(new Set(ids).size).toBe(ids.length); // no repeated stop across the trip
+  });
+
+  it("plan: at most 3 stops per day", async () => {
+    const r = await recommend("Beijing", cfg, makeFetch(happyRoutes(weatherBody(5))), 5);
+    for (const d of r.days) {
+      expect(d.itinerary.length).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it("plan: each day's stops are geographically clustered (no far outlier mixed in)", async () => {
+    // One far attraction ranked highly + several nearby ones.
+    const pois = {
+      status: "1",
+      count: "5",
+      pois: [
+        { id: "NEAR1", name: "近1", typecode: "140100", location: "116.400,39.900" },
+        { id: "NEAR2", name: "近2", typecode: "140100", location: "116.410,39.905" },
+        { id: "NEAR3", name: "近3", typecode: "140100", location: "116.405,39.895" },
+        { id: "FAR", name: "远", typecode: "140100", location: "108.000,34.000" },
+        { id: "NEAR4", name: "近4", typecode: "140100", location: "116.415,39.910" },
+      ],
+    };
+    const routes = happyRoutes(weatherBody(2)).map((r) =>
+      r.match === AMAP_TEXT
+        ? { ...r, respond: (url: string) => (url.includes("types=100000") ? hotelPoisBody : pois) }
+        : r,
+    );
+    const r = await recommend("Beijing", cfg, makeFetch(routes), 1);
+    const stops = r.days[0].itinerary;
+    expect(stops.length).toBeLessThanOrEqual(3);
+    // The far outlier must not be grouped with the nearby cluster.
+    expect(stops.some((s) => s.id === "FAR")).toBe(false);
   });
 });

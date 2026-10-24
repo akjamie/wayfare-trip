@@ -37,4 +37,12 @@ describe("i18n", () => {
     expect(weatherText("en", 61)).toBe("Slight rain");
     expect(weatherText("zh-CN", 61)).toBe("小雨");
   });
+
+  it("AC18: hotel/route labels are localized in both catalogs", () => {
+    expect(t("en", "hotel.star", { n: 4 })).toContain("4");
+    expect(t("zh-CN", "hotel.star", { n: 4 })).toContain("4");
+    expect(t("en", "notice.no_hotel_data").length).toBeGreaterThan(0);
+    expect(t("zh-CN", "notice.no_hotel_data").length).toBeGreaterThan(0);
+    expect(t("en", "route.mode.walk")).not.toBe(t("zh-CN", "route.mode.walk"));
+  });
 });
