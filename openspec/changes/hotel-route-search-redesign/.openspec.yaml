@@ -2,7 +2,7 @@ schema: agentic-repo-change
 created: 2026-10-21
 requirement: "在现有 '天气感知景点推荐' 基础上新增: (1) 重新设计顶部搜索框,改善用户体验; (2) 推荐计划中加入住宿酒店推荐,并支持在顶部搜索框以可选方式输入酒店星级或价格区间; (3) 在给出推荐酒店后,提供包含酒店的出行路线/日程安排"
 targetBranch: "main"
-lastPrType: "spec"
-prUrl: "https://github.com/akjamie/wayfare-trip/pull/6"
+lastPrType: "impl"
+prUrl: "https://github.com/akjamie/wayfare-trip/pull/7"
 specSha: ce0048793a9deafc6fa8a991c756dbec0ee8d7b5
 status: ready_for_impl
