@@ -210,7 +210,7 @@ async function run() {
   if (priceMax.value.trim()) params.set("priceMax", priceMax.value.trim());
 
   try {
-    const res = await fetch(`/api/recommend?${params.toString()}`);
+    const res = await fetch(`/api/recommend?${params.toString()}`, { cache: "no-store" });
     const data = await res.json();
     loadingEl.hidden = true;
     if (!res.ok) {
