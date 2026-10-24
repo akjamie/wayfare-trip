@@ -69,7 +69,7 @@
 
 ## 6. Converge & verify
 - [x] 6.1 [IMPL] Run the full suite; confirm every AC is covered. (AC1–AC19)
-  - evidence: `npm test` -> PASS — Test Files 15 passed (15), Tests 65 passed (65).
+  - evidence: `npm test` -> PASS — Test Files 15 passed (15), Tests 67 passed (67).
   - evidence: `npx tsc --noEmit` -> exit 0.
 - [x] 6.2 [IMPL] Live smoke: real Amap hotel search + a rendered plan with hotels/route. (AC8, AC11)
   - evidence: Xi'an → 3 hotels; day1 3 stops / 4 legs (24 km / 53 min); day2 3 stops / 4 legs (142.1 km / 284 min).

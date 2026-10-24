@@ -85,6 +85,7 @@ function makeDay(
   hot: boolean,
   cfg: Config,
   lang: Lang,
+  strictIndoor: boolean,
 ): DayRecommendation {
   return {
     date: day.date,
@@ -97,7 +98,7 @@ function makeDay(
     },
     advice: dayAdvice(day, rain, hot, cfg, lang),
     attractions: ranked,
-    itinerary: buildItinerary(ranked, { rain, hot }, lang),
+    itinerary: buildItinerary(ranked, { rain, hot, strictIndoor }, lang),
     route: { ...EMPTY_ROUTE },
   };
 }
@@ -145,29 +146,31 @@ export async function recommend(
   );
 
   const dayRecs: DayRecommendation[] = [];
-  const used = new Set<string>();
-  for (const day of forecast) {
+  const lastUsed = new Map<string, number>();
+  const MIN_FRESH = 3;
+  let limitedIndoor = false;
+
+  for (let di = 0; di < forecast.length; di += 1) {
+    const day = forecast[di];
     const rain = isRainyDay(day, cfg);
     const hot = isHotDay(day, cfg);
 
-    // Prefer attractions not shown on earlier days so a multi-day plan does not
-    // repeat the same places every day; only reuse once the pool is exhausted.
-    let pool = attractions.filter((a) => !used.has(a.id));
+    const fresh = attractions.filter((a) => !lastUsed.has(a.id));
+    const reused = attractions
+      .filter((a) => lastUsed.has(a.id))
+      .map((a) => ({ ...a, relevanceRank: 1000 + (lastUsed.get(a.id) ?? 0) }));
+
+    let pool: Attraction[] = fresh.length >= MIN_FRESH ? fresh : [...fresh, ...reused];
     if (pool.length === 0) pool = attractions;
 
-    // Keep rainy-day indoor-first meaningful even late in a trip.
-    if (rain) {
-      const shelteredFresh = pool.filter((a) => a.environment !== "outdoor");
-      if (shelteredFresh.length === 0) {
-        const shelteredAll = attractions.filter((a) => a.environment !== "outdoor");
-        const extra = shelteredAll.filter((a) => !pool.includes(a));
-        if (extra.length > 0) pool = [...pool, ...extra];
-      }
-    }
+    // Strict indoor plan only when the unseen pool has enough indoor/mixed options.
+    const shelteredFresh = fresh.filter((a) => a.environment !== "outdoor").length;
+    const strictIndoor = rain && shelteredFresh >= 2;
+    if (rain && !strictIndoor) limitedIndoor = true;
 
     const ranked = rankForDay(pool, { rain, hot }, cfg, lang);
-    const dayRec = makeDay(day, ranked, rain, hot, cfg, lang);
-    for (const stop of dayRec.itinerary) used.add(stop.id);
+    const dayRec = makeDay(day, ranked, rain, hot, cfg, lang, strictIndoor);
+    for (const stop of dayRec.itinerary) lastUsed.set(stop.id, di);
     dayRecs.push(dayRec);
   }
 
@@ -186,6 +189,7 @@ export async function recommend(
 
   const notices: string[] = [];
   if (attractions.length === 0) notices.push(t(lang, "notice.no_attraction_data"));
+  if (limitedIndoor) notices.push(t(lang, "notice.limited_indoor"));
   if (hotels.length === 0) {
     const hasFilter =
       filters.star !== undefined || filters.priceMin !== undefined || filters.priceMax !== undefined;

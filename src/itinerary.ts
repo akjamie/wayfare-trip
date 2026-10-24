@@ -21,13 +21,16 @@ function centroid(items: RankedAttraction[]): Point {
  */
 export function buildItinerary(
   ranked: RankedAttraction[],
-  opts: { rain: boolean; hot: boolean },
+  opts: { rain: boolean; hot: boolean; strictIndoor?: boolean },
   lang: Lang,
 ): ItineraryStop[] {
   if (ranked.length === 0) return [];
 
-  const sheltered = opts.rain ? ranked.filter((a) => a.environment !== "outdoor") : ranked;
-  const base = sheltered.length > 0 ? sheltered : ranked;
+  // When there are enough indoor/mixed options, keep a strict indoor plan;
+  // otherwise allow outdoor stops (recommend() decides and flags it).
+  const base = opts.strictIndoor
+    ? ranked.filter((a) => a.environment !== "outdoor")
+    : ranked;
 
   const chosen: RankedAttraction[] = [base[0]];
   const remaining = base.slice(1);
