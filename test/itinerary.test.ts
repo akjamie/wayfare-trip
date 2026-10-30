@@ -55,7 +55,7 @@ describe("itinerary", () => {
     };
     const routes = happyRoutes(weatherBody(3)).map((r) =>
       r.match === AMAP_TEXT
-        ? { ...r, respond: (url: string) => (url.includes("types=100000") ? hotelPoisBody : manyPois) }
+        ? { ...r, respond: (url: string) => (url.includes("types=110000") === false ? hotelPoisBody : manyPois) }
         : r,
     );
     const r = await recommend("Beijing", cfg, makeFetch(routes), 3);
@@ -86,7 +86,7 @@ describe("itinerary", () => {
     };
     const routes = happyRoutes(weatherBody(2)).map((r) =>
       r.match === AMAP_TEXT
-        ? { ...r, respond: (url: string) => (url.includes("types=100000") ? hotelPoisBody : pois) }
+        ? { ...r, respond: (url: string) => (url.includes("types=110000") === false ? hotelPoisBody : pois) }
         : r,
     );
     const r = await recommend("Beijing", cfg, makeFetch(routes), 1);

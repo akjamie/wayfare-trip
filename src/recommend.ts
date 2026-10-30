@@ -6,23 +6,22 @@ import { fetchForecast } from "./weather.js";
 import { dayAdvice, isHotDay, isRainyDay } from "./advice.js";
 import { DEFAULT_LANG, t, weatherText, type Lang } from "./i18n.js";
 import { rankForDay } from "./rank.js";
-import { buildItinerary } from "./itinerary.js";
+import { buildItinerary, scheduleDay } from "./itinerary.js";
 import { filterAndRankHotels } from "./hotels.js";
-import { buildRoute } from "./route.js";
+import { buildRoute, type DirectionResolver } from "./route.js";
 import { AppError } from "./errors.js";
 import type {
   Attraction,
   DayRecommendation,
-  DayRoute,
   ForecastDay,
   HotelFilters,
+  ItineraryStopDraft,
+  RankedAttraction,
   Recommendation,
 } from "./types.js";
 
 export const NO_ATTRACTION_NOTICE =
   "No attraction data is available for this city yet.";
-
-const EMPTY_ROUTE: DayRoute = { legs: [], totalDistanceKm: 0, totalDurationMin: 0 };
 
 export function validateCity(input: string | null | undefined): string {
   const city = (input ?? "").trim();
@@ -78,31 +77,6 @@ export function parseHotelFilters(
   return filters;
 }
 
-function makeDay(
-  day: ForecastDay,
-  ranked: ReturnType<typeof rankForDay>,
-  rain: boolean,
-  hot: boolean,
-  cfg: Config,
-  lang: Lang,
-  strictIndoor: boolean,
-): DayRecommendation {
-  return {
-    date: day.date,
-    weather: {
-      summary: weatherText(lang, day.weatherCode),
-      tempMaxC: day.tempMaxC,
-      tempMinC: day.tempMinC,
-      precipProb: day.precipProb,
-      weatherCode: day.weatherCode,
-    },
-    advice: dayAdvice(day, rain, hot, cfg, lang),
-    attractions: ranked,
-    itinerary: buildItinerary(ranked, { rain, hot, strictIndoor }, lang),
-    route: { ...EMPTY_ROUTE },
-  };
-}
-
 function buildSummary(
   city: { name: string; admin1: string },
   days: DayRecommendation[],
@@ -145,46 +119,58 @@ export async function recommend(
     cfg.timeoutMs,
   );
 
-  const dayRecs: DayRecommendation[] = [];
-  const lastUsed = new Map<string, number>();
   const MIN_FRESH = 3;
+  const lastUsed = new Map<string, number>();
   let limitedIndoor = false;
+  const dayRanked: RankedAttraction[][] = [];
+  const dayStops: ItineraryStopDraft[][] = [];
+  const dayRainHot: Array<{ rain: boolean; hot: boolean }> = [];
 
+  // Phase A — cluster each day's candidates (hotel/times come later).
   for (let di = 0; di < forecast.length; di += 1) {
     const day = forecast[di];
     const rain = isRainyDay(day, cfg);
     const hot = isHotDay(day, cfg);
+    dayRainHot.push({ rain, hot });
 
     const fresh = attractions.filter((a) => !lastUsed.has(a.id));
     const reused = attractions
       .filter((a) => lastUsed.has(a.id))
       .map((a) => ({ ...a, relevanceRank: 1000 + (lastUsed.get(a.id) ?? 0) }));
 
-    let pool: Attraction[] = fresh.length >= MIN_FRESH ? fresh : [...fresh, ...reused];
-    if (pool.length === 0) pool = attractions;
+    const pool: Attraction[] =
+      fresh.length >= MIN_FRESH ? fresh : [...fresh, ...reused];
+    const use = pool.length > 0 ? pool : attractions;
 
     // Strict indoor plan only when the unseen pool has enough indoor/mixed options.
     const shelteredFresh = fresh.filter((a) => a.environment !== "outdoor").length;
     const strictIndoor = rain && shelteredFresh >= 2;
     if (rain && !strictIndoor) limitedIndoor = true;
 
-    const ranked = rankForDay(pool, { rain, hot }, cfg, lang);
-    const dayRec = makeDay(day, ranked, rain, hot, cfg, lang, strictIndoor);
-    for (const stop of dayRec.itinerary) lastUsed.set(stop.id, di);
-    dayRecs.push(dayRec);
+    const ranked = rankForDay(use, { rain, hot }, cfg, lang);
+    dayRanked.push(ranked);
+    const stops = buildItinerary(ranked, { rain, hot, strictIndoor }, lang, cfg);
+    for (const s of stops) lastUsed.set(s.id, di);
+    dayStops.push(stops);
   }
 
-  // Hotel recommendations: centroid of all itinerary stops (fallback: city).
-  const stops = dayRecs.flatMap((d) => d.itinerary);
-  const centroid = stops.length
+  // Phase B — hotels from the centroid of all planned stops (fallback: city).
+  const allStops = dayStops.flat();
+  const centroid = allStops.length
     ? {
-        lat: stops.reduce((s, x) => s + x.lat, 0) / stops.length,
-        lon: stops.reduce((s, x) => s + x.lon, 0) / stops.length,
+        lat: allStops.reduce((s, x) => s + x.lat, 0) / allStops.length,
+        lon: allStops.reduce((s, x) => s + x.lon, 0) / allStops.length,
       }
     : { lat: city.lat, lon: city.lon };
 
-  const hotelPois = await client.hotels(city.adcode);
-  const hotels = filterAndRankHotels(hotelPois, filters, centroid, lang);
+  const hotelPois = await client.hotels(city.adcode, filters.star);
+  const hotels = filterAndRankHotels(
+    hotelPois,
+    filters,
+    centroid,
+    lang,
+    cfg.hotelBrands,
+  );
   const primary = hotels[0] ?? null;
 
   const notices: string[] = [];
@@ -196,8 +182,38 @@ export async function recommend(
     notices.push(t(lang, hasFilter ? "notice.no_hotel_match" : "notice.no_hotel_data"));
   }
 
-  for (const d of dayRecs) {
-    d.route = buildRoute(primary, d.itinerary);
+  // Phase C — schedule each day (visit + real travel) and build its route.
+  const resolver: DirectionResolver = async (from, to, mode) =>
+    client.direction(from, to, mode);
+
+  const dayRecs: DayRecommendation[] = [];
+  for (let di = 0; di < forecast.length; di += 1) {
+    const day = forecast[di];
+    const { rain, hot } = dayRainHot[di];
+    const stops = dayStops[di];
+
+    const prelim = await buildRoute(primary, stops, resolver);
+    const travelMin = primary
+      ? prelim.legs.map((l) => l.durationMin)
+      : [0, ...prelim.legs.map((l) => l.durationMin)];
+    const { stops: scheduled, totalMinutes } = scheduleDay(stops, travelMin, cfg);
+    const route = await buildRoute(primary, scheduled, resolver);
+
+    dayRecs.push({
+      date: day.date,
+      weather: {
+        summary: weatherText(lang, day.weatherCode),
+        tempMaxC: day.tempMaxC,
+        tempMinC: day.tempMinC,
+        precipProb: day.precipProb,
+        weatherCode: day.weatherCode,
+      },
+      advice: dayAdvice(day, rain, hot, cfg, lang),
+      attractions: dayRanked[di],
+      itinerary: scheduled,
+      route,
+      totalMinutes,
+    });
   }
 
   const summary = buildSummary(city, dayRecs, notices, lang);

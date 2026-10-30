@@ -29,14 +29,14 @@ Need orientation? `asdlc status <ID>` (where am I / next command) and `asdlc doc
 God nodes (most connected):
   1. recommend() - 18 edges
   2. loadConfig() - 17 edges
-  3. createApp() - 15 edges
+  3. createApp() - 16 edges
   4. t() - 15 edges
   5. vitest - 15 edges
-  6. Requirements - 14 edges
-  7. makeFetch() - 13 edges
-  8. compilerOptions - 13 edges
-  9. AppError - 12 edges
-  10. resolveCity() - 12 edges
+  6. AmapClient - 14 edges
+  7. Requirements - 14 edges
+  8. AppError - 13 edges
+  9. makeFetch() - 13 edges
+  10. compilerOptions - 13 edges
 
 _Architectural hubs = the most-connected modules. Run `asdlc new <change>`
 to query the graph for detail._

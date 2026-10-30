@@ -47,6 +47,7 @@ export interface RankedAttraction {
   id: string;
   name_zh: string;
   environment: Environment;
+  category?: string;
   location: string;
   advisories: string[];
   reason: string;
@@ -62,9 +63,15 @@ export interface ItineraryStop {
   id: string;
   name_zh: string;
   environment: Environment;
+  visitMinutes: number;
+  startTime: string;
+  endTime: string;
   lat: number;
   lon: number;
 }
+
+/** A clustered stop before the day schedule assigns start/end times. */
+export type ItineraryStopDraft = Omit<ItineraryStop, "startTime" | "endTime">;
 
 export interface HotelFilters {
   star?: 3 | 4 | 5;
@@ -82,6 +89,7 @@ export interface Hotel {
   image: string | null;
   reason: string;
   primary: boolean;
+  brand?: string;
   lat: number;
   lon: number;
 }
@@ -109,6 +117,7 @@ export interface DayRecommendation {
   attractions: RankedAttraction[];
   itinerary: ItineraryStop[];
   route: DayRoute;
+  totalMinutes: number;
 }
 
 export interface Recommendation {
