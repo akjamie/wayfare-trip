@@ -163,10 +163,18 @@ export async function recommend(
       }
     : { lat: city.lat, lon: city.lon };
 
-  const hotelPois = await client.hotels(city.adcode, filters.star);
+  let hotelPois = await client.hotels(city.adcode, filters.star);
+  let starFallback = false;
+  // Small cities may have no starred hotels at all — fall back to the best
+  // available real hotels instead of an empty list.
+  if (filters.star !== undefined && hotelPois.length === 0) {
+    hotelPois = await client.hotels(city.adcode);
+    starFallback = true;
+  }
+  const effectiveFilters = starFallback ? { ...filters, star: undefined } : filters;
   const hotels = filterAndRankHotels(
     hotelPois,
-    filters,
+    effectiveFilters,
     centroid,
     lang,
     cfg.hotelBrands,
@@ -176,6 +184,9 @@ export async function recommend(
   const notices: string[] = [];
   if (attractions.length === 0) notices.push(t(lang, "notice.no_attraction_data"));
   if (limitedIndoor) notices.push(t(lang, "notice.limited_indoor"));
+  if (starFallback) {
+    notices.push(t(lang, "notice.no_star_match", { n: filters.star ?? 0 }));
+  }
   if (hotels.length === 0) {
     const hasFilter =
       filters.star !== undefined || filters.priceMin !== undefined || filters.priceMax !== undefined;

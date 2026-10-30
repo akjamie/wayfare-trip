@@ -5,7 +5,8 @@ import { t, type Lang } from "./i18n.js";
 
 const MAX_HOTELS = 3;
 
-/** Only real hotels (generic 100000 / hostels 100200|100201 are excluded upstream). */
+/** Only real hotels (generic 100000 / hostels 100200|100201 / compound
+ *  place-name codes like 190108|100100 are excluded upstream and here). */
 const REAL_HOTEL_TYPECODES = new Set([
   "100100",
   "100101",
@@ -16,7 +17,7 @@ const REAL_HOTEL_TYPECODES = new Set([
 ]);
 
 export function isRealHotel(typecode: string): boolean {
-  return REAL_HOTEL_TYPECODES.has(typecode);
+  return REAL_HOTEL_TYPECODES.has(typecode) && !typecode.includes("1901");
 }
 
 export function brandFor(name: string, brands: string[]): string | undefined {
@@ -58,20 +59,20 @@ export function filterAndRankHotels(
       distance: haversineKm(centroid, { lat: p.lat, lon: p.lon }),
     }))
     .sort((a, b) => {
-      // High-star hotels first (unknown level last).
-      const sa = a.p.star;
-      const sb = b.p.star;
-      if (sa !== undefined && sb === undefined) return -1;
-      if (sa === undefined && sb !== undefined) return 1;
-      if (sa !== undefined && sb !== undefined && sa !== sb) return sb - sa;
-      // Mainstream-brand boost (brand before non-brand).
-      if (!!a.brand !== !!b.brand) return a.brand ? -1 : 1;
-      // Rating desc, missing last.
+      // Rating desc, missing last — travelers trust the score first.
       const ra = a.p.rating;
       const rb = b.p.rating;
       if (ra === undefined && rb !== undefined) return 1;
       if (ra !== undefined && rb === undefined) return -1;
       if (ra !== undefined && rb !== undefined && ra !== rb) return rb - ra;
+      // Mainstream-brand boost (brand before non-brand) on rating ties.
+      if (!!a.brand !== !!b.brand) return a.brand ? -1 : 1;
+      // High-star hotels next (unknown level last).
+      const sa = a.p.star;
+      const sb = b.p.star;
+      if (sa !== undefined && sb === undefined) return -1;
+      if (sa === undefined && sb !== undefined) return 1;
+      if (sa !== undefined && sb !== undefined && sa !== sb) return sb - sa;
       // Amap relevance asc, then distance asc, then id asc.
       if (a.p.relevanceRank !== b.p.relevanceRank) {
         return a.p.relevanceRank - b.p.relevanceRank;

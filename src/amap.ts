@@ -235,28 +235,52 @@ export class AmapClient {
   }
 
   private async fetchHotels(adcode: string, star?: 3 | 4 | 5): Promise<HotelPoi[]> {
-    const url =
-      "https://restapi.amap.com/v3/place/text" +
-      `?key=${encodeURIComponent(this.key)}` +
-      `&types=${encodeURIComponent(this.hotelTypesForStar(star))}&city=${encodeURIComponent(adcode)}&citylimit=true` +
-      `&offset=25&page=1&extensions=all`;
-    let data: any;
-    try {
-      data = await getJson(this.fetchImpl, url, this.cfg.timeoutMs);
-    } catch (err) {
-      logUpstreamError("attraction_source_unavailable", err);
-      throw AppError.attractionSourceUnavailable();
+    // Amap ranks by its own relevance and buries large hotels pages deep for
+    // small cities — paginate so the whole result set is visible.
+    const MAX_PAGES = 4;
+    const PER_PAGE = 25;
+    const raw: any[] = [];
+    const seen = new Set<string>();
+
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+      const url =
+        "https://restapi.amap.com/v3/place/text" +
+        `?key=${encodeURIComponent(this.key)}` +
+        `&types=${encodeURIComponent(this.hotelTypesForStar(star))}&city=${encodeURIComponent(adcode)}&citylimit=true` +
+        `&offset=${PER_PAGE}&page=${page}&extensions=all`;
+      let data: any;
+      try {
+        data = await getJson(this.fetchImpl, url, this.cfg.timeoutMs);
+      } catch (err) {
+        if (page === 1) {
+          logUpstreamError("attraction_source_unavailable", err);
+          throw AppError.attractionSourceUnavailable();
+        }
+        break; // later pages are best-effort
+      }
+      if (data?.status !== "1") {
+        if (page === 1) {
+          logUpstreamError(
+            "attraction_source_unavailable",
+            `hotel status=${data?.status} infocode=${data?.infocode}`,
+          );
+          throw AppError.attractionSourceUnavailable();
+        }
+        break;
+      }
+      const pois = Array.isArray(data.pois) ? data.pois : [];
+      for (const p of pois) {
+        if (p && p.id && !seen.has(p.id)) {
+          seen.add(p.id);
+          raw.push(p);
+        }
+      }
+      if (pois.length < PER_PAGE) break; // last page
     }
-    if (data?.status !== "1") {
-      logUpstreamError(
-        "attraction_source_unavailable",
-        `hotel status=${data?.status} infocode=${data?.infocode}`,
-      );
-      throw AppError.attractionSourceUnavailable();
-    }
-    const pois = Array.isArray(data.pois) ? data.pois : [];
-    const hotels = pois
-      .filter((p: any) => p && p.id)
+
+    // Drop compound "place-name + lodging" POIs (e.g. typecode 190108|100100).
+    const hotels = raw
+      .filter((p: any) => p && p.id && !String(p?.typecode ?? "").includes("1901"))
       .map((p: any, i: number) => toHotelPoi(p, i));
     const cacheKey = `${adcode}:${star ?? 0}`;
     this.hotelCache.set(cacheKey, { value: hotels, expires: Date.now() + this.cfg.cacheTtlMs });

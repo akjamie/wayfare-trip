@@ -83,6 +83,32 @@ describe("city resolution", () => {
     });
   });
 
+  it("AC4b: county-level matches resolve to the county (e.g. 石泉 → 610922)", async () => {
+    const f = makeFetch([
+      {
+        match: AMAP_GEOCODE,
+        respond: () => ({
+          status: "1",
+          geocodes: [
+            {
+              city: "安康市",
+              province: "陕西省",
+              district: "石泉县",
+              adcode: "610922",
+              level: "区县",
+              location: "108.244,33.038",
+            },
+          ],
+        }),
+      },
+    ]);
+    const r = await resolveCity("石泉", cfg, f);
+    expect(r.adcode).toBe("610922");
+    expect(r.nameZh).toBe("石泉县");
+    expect(r.admin1).toBe("安康市");
+    expect(r.country).toBe("CN");
+  });
+
   it("AC6: geocode failure -> attraction_source_unavailable; no city-level -> unknown_city", async () => {
     const failing = makeFetch([], { fail: (u) => u.includes(AMAP_GEOCODE) });
     await expect(resolveCity("Somewhereville", cfg, failing)).rejects.toMatchObject({

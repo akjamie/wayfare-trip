@@ -34,7 +34,7 @@ function findCityAlias(key: string): CityAlias | undefined {
 /**
  * Resolve a city name (Chinese / pinyin / English) to a single canonical Chinese
  * city. Alias table first (offline), then Amap geocode fallback. Accepts only
- * city-level (level=市) matches; multiple -> ambiguous_city; geocode failure ->
+ * city-level or county-level (level=市/区县) matches; multiple -> ambiguous_city; geocode failure ->
  * attraction_source_unavailable (not unknown_city).
  */
 export async function resolveCity(
@@ -77,7 +77,11 @@ export async function resolveCity(
   }
 
   const geocodes = Array.isArray(data.geocodes) ? data.geocodes : [];
-  const cityLevel = geocodes.filter((g: any) => g && g.adcode && g.level === "市");
+  // Accept city-level and county-level matches (counties like 石泉 are legit
+  // trip destinations with their own adcode); reject villages/POI-level guesses.
+  const cityLevel = geocodes.filter(
+    (g: any) => g && g.adcode && (g.level === "市" || g.level === "区县"),
+  );
   if (cityLevel.length === 0) throw AppError.unknownCity();
   if (cityLevel.length > 1) {
     const candidates: CityCandidate[] = cityLevel.map((g: any) => ({
@@ -90,10 +94,15 @@ export async function resolveCity(
 
   const g = cityLevel[0];
   const [lng, lat] = String(g.location ?? "0,0").split(",").map(Number);
+  // County-level matches: name = the county (石泉县), admin1 = its prefecture city
+  // (安康市) — that is the "admin1" travelers expect for a county destination.
+  const isCounty = g.level === "区县";
+  const localName =
+    isCounty && g.district ? String(g.district) : String(g.city ?? name);
   return {
-    name: String(g.city ?? name),
-    nameZh: String(g.city ?? name),
-    admin1: String(g.province ?? ""),
+    name: localName,
+    nameZh: localName,
+    admin1: isCounty ? String(g.city ?? "") : String(g.province ?? ""),
     country: "CN",
     lat: lat || 0,
     lon: lng || 0,

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { recommend } from "../src/recommend.js";
 import { filterAndRankHotels } from "../src/hotels.js";
 import { loadConfig } from "../src/config.js";
-import { makeFetch, happyRoutes, AMAP_TEXT, poisBody } from "./helpers.js";
+import { makeFetch, happyRoutes, AMAP_TEXT, poisBody, hotelPoisBody } from "./helpers.js";
 
 const cfg = { ...loadConfig({} as Record<string, string>, {}), amapKey: "testkey" };
 
@@ -90,6 +90,28 @@ describe("hotels", () => {
     const ranked = filterAndRankHotels(pois as any, {}, { lat: 39.9, lon: 116.4 }, "en", cfg.hotelBrands);
     expect(ranked[0].id).toBe("BRAND"); // brand boost beats the non-brand at equal relevance
     expect(ranked[0].brand).toBeTruthy();
+  });
+
+  it("AC9b: star filter with zero starred hotels falls back to best available + notice", async () => {
+    // star=5 query returns nothing; the all-real-hotels query returns H5/H4/H2.
+    const routes = happyRoutes().map((r) =>
+      r.match === AMAP_TEXT
+        ? {
+            ...r,
+            respond: (url: string) => {
+              if (url.includes("types=110000")) return poisBody; // attractions
+              if (url.includes("types=100100")) return hotelPoisBody; // all real hotels
+              if (url.includes("types=100101")) return { status: "1", count: "0", pois: [] }; // 5★ only
+              return { status: "1", count: "0", pois: [] };
+            },
+          }
+        : r,
+    );
+    const r = await recommend("Beijing", cfg, makeFetch(routes), 2, undefined, "en", {
+      star: 5,
+    });
+    expect(r.hotels.length).toBeGreaterThan(0);
+    expect(r.notices.some((n) => /5-star/i.test(n))).toBe(true);
   });
 
   it("AC15: zero usable hotels → notice + routes without hotel endpoints", async () => {
