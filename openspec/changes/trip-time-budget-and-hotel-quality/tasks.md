@@ -52,7 +52,7 @@
 
 ## 6. Converge & verify
 - [x] 6.1 [IMPL] Full suite + typecheck. (AC1–AC13)
-  - evidence: `npm test` -> PASS — 16 files / 71 tests.
+  - evidence: `npm test` -> PASS — 15 files / 70 tests.
   - evidence: `npx tsc --noEmit` -> exit 0.
 - [x] 6.2 [IMPL] Live smoke: real direction legs + hotels for a city. (AC9, AC11)
   - evidence: Xi'an → 3 hotels; day1 3 stops (09:50–15:29, 445 min total incl. real drive/walk legs 9.8km/50min, 0.5km/7min…); day2 342 min.
