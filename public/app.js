@@ -127,18 +127,21 @@ function render(data) {
         (h) =>
           `<article class="hotel">${imageOrPlaceholder(h)}<div class="body">` +
           `<h3>${esc(h.name_zh)}${h.primary ? `<span class="badge">${esc(ui.primary)}</span>` : ""}</h3>` +
-          `<p class="meta">${h.star ? `★${h.star} · ` : ""}${h.price !== undefined ? `¥${h.price}` : ""}${h.rating !== undefined ? ` · ${h.rating}` : ""}</p>` +
+          `<p class="meta">${[h.star ? `★${h.star}` : "", h.brand ?? "", h.price !== undefined ? `¥${h.price}` : "", h.rating !== undefined ? `${h.rating}` : ""].filter(Boolean).join(" · ")}</p>` +
           `<p class="meta">${esc(h.reason)}</p></div></article>`,
       )
       .join("") || `<p class="summary">${esc(ui.noHotels)}</p>`;
 
-  // Trip plan (itinerary)
+  // Trip plan (itinerary) — per-stop times + durations, day total
   itineraryEl.innerHTML = data.days
     .filter((d) => d.itinerary?.length)
     .map(
       (d) =>
-        `<div class="day-panel"><h3>${esc(d.date)}</h3><ul class="slots">${d.itinerary
-          .map((s) => `<li><span class="slot">${esc(s.label)}</span><span>${esc(s.name_zh)}</span></li>`)
+        `<div class="day-panel"><h3>${esc(d.date)} <span class="tag">${esc(String(d.totalMinutes))} min</span></h3><ul class="slots">${d.itinerary
+          .map(
+            (s) =>
+              `<li><span class="slot">${esc(s.label)} ${esc(s.startTime)}–${esc(s.endTime)}</span><span>${esc(s.name_zh)} <span class="tag">${esc(s.visitMinutes)} min</span></span></li>`,
+          )
           .join("")}</ul></div>`,
     )
     .join("");

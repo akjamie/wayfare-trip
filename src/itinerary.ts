@@ -1,6 +1,8 @@
-import type { ItineraryStop, RankedAttraction } from "./types.js";
+import type { Config } from "./config.js";
+import type { ItineraryStop, ItineraryStopDraft, RankedAttraction } from "./types.js";
 import { t, type Lang } from "./i18n.js";
 import { haversineKm, type Point } from "./route.js";
+import { visitMinutesFor } from "./duration.js";
 
 const SLOTS = ["morning", "afternoon", "evening"] as const;
 const MAX_STOPS = 3;
@@ -13,24 +15,24 @@ function centroid(items: RankedAttraction[]): Point {
 }
 
 /**
- * Build a geographically clustered day itinerary (≤3 stops):
- *  - rainy day: only indoor/mixed stops;
- *  - start from the top-ranked seed, then add the nearest remaining stop
- *    (so a day's stops are close together);
- *  - hot day: the midday (afternoon) stop must not be outdoor.
+ * Cluster a day's candidates (≤3) so stops are geographically close:
+ *  - start from the top-ranked seed, then add the nearest remaining stop;
+ *  - hot day: the midday (afternoon) stop must not be outdoor;
+ *  - strict indoor only when recommend() decided there are enough indoor options.
+ * Each stop carries its system-recommended `visitMinutes`.
  */
 export function buildItinerary(
   ranked: RankedAttraction[],
   opts: { rain: boolean; hot: boolean; strictIndoor?: boolean },
   lang: Lang,
-): ItineraryStop[] {
+  cfg: Config,
+): ItineraryStopDraft[] {
   if (ranked.length === 0) return [];
 
-  // When there are enough indoor/mixed options, keep a strict indoor plan;
-  // otherwise allow outdoor stops (recommend() decides and flags it).
   const base = opts.strictIndoor
     ? ranked.filter((a) => a.environment !== "outdoor")
     : ranked;
+  if (base.length === 0) return [];
 
   const chosen: RankedAttraction[] = [base[0]];
   const remaining = base.slice(1);
@@ -68,7 +70,41 @@ export function buildItinerary(
     id: a.id,
     name_zh: a.name_zh,
     environment: a.environment,
+    visitMinutes: visitMinutesFor(a.category, a.name_zh, cfg),
     lat: a.lat,
     lon: a.lon,
   }));
+}
+
+const hhmm = (minutes: number) =>
+  `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+
+/**
+ * Schedule stops inside the day window: travel to each stop + visit time.
+ * Stops that would end after the window are dropped. Returns the scheduled
+ * stops plus the day `totalMinutes` (visits + travel, including the return leg).
+ */
+export function scheduleDay(
+  stops: ItineraryStopDraft[],
+  travelMin: number[],
+  cfg: Config,
+): { stops: ItineraryStop[]; totalMinutes: number } {
+  const out: ItineraryStop[] = [];
+  let t = cfg.dayStartMin;
+
+  for (let i = 0; i < stops.length; i += 1) {
+    const travel = travelMin[i] ?? 0;
+    const start = t + travel;
+    const end = start + stops[i].visitMinutes;
+    if (end > cfg.dayEndMin) break; // this stop (and the rest) exceed the window
+    out.push({ ...stops[i], startTime: hhmm(start), endTime: hhmm(end) });
+    t = end;
+  }
+
+  const last = out[out.length - 1];
+  if (!last) return { stops: [], totalMinutes: 0 };
+  const lastEnd = Math.floor(t) ;
+  const returnTravel = travelMin[out.length] ?? 0;
+  const totalMinutes = lastEnd + returnTravel - cfg.dayStartMin;
+  return { stops: out, totalMinutes };
 }

@@ -88,8 +88,14 @@ export interface HotelPoi {
   rating?: number;
   address?: string;
   image: string | null;
+  relevanceRank: number;
   lat: number;
   lon: number;
+}
+
+export interface LegTime {
+  distanceKm: number;
+  durationMin: number;
 }
 
 /** Amap hotel typecode -> star level (minimum-filter basis). */
@@ -119,7 +125,7 @@ export function hotelStarFromType(typeStr: string): number | undefined {
   return undefined;
 }
 
-function toHotelPoi(poi: any): HotelPoi {
+function toHotelPoi(poi: any, rank: number): HotelPoi {
   const loc = String(poi?.location ?? "");
   const [lngStr, latStr] = loc.split(",");
   const typecode = String(poi?.typecode ?? "");
@@ -140,6 +146,7 @@ function toHotelPoi(poi: any): HotelPoi {
     rating: Number.isFinite(rating) ? rating : undefined,
     address: poi?.address ? String(poi.address) : undefined,
     image,
+    relevanceRank: rank,
     lat: Number(latStr) || 0,
     lon: Number(lngStr) || 0,
   };
@@ -151,6 +158,7 @@ export class AmapClient {
   private readonly adcodeCache = new Map<string, { value: string; expires: number }>();
   private readonly hotelCache = new Map<string, { value: HotelPoi[]; expires: number }>();
   private readonly hotelInflight = new Map<string, Promise<HotelPoi[]>>();
+  private readonly directionCache = new Map<string, { value: LegTime; expires: number }>();
 
   constructor(
     private readonly fetchImpl: FetchLike,
@@ -215,7 +223,7 @@ export class AmapClient {
     const url =
       "https://restapi.amap.com/v3/place/text" +
       `?key=${encodeURIComponent(this.key)}` +
-      `&types=100000&city=${encodeURIComponent(adcode)}&citylimit=true` +
+      `&types=${encodeURIComponent(this.cfg.hotelTypes)}&city=${encodeURIComponent(adcode)}&citylimit=true` +
       `&offset=25&page=1&extensions=all`;
     let data: any;
     try {
@@ -232,9 +240,57 @@ export class AmapClient {
       throw AppError.attractionSourceUnavailable();
     }
     const pois = Array.isArray(data.pois) ? data.pois : [];
-    const hotels = pois.filter((p: any) => p && p.id).map((p: any) => toHotelPoi(p));
+    const hotels = pois
+      .filter((p: any) => p && p.id)
+      .map((p: any, i: number) => toHotelPoi(p, i));
     this.hotelCache.set(adcode, { value: hotels, expires: Date.now() + this.cfg.cacheTtlMs });
     return hotels;
+  }
+
+  /** Real road distance/duration from the Amap direction API (cached per leg). */
+  async direction(
+    from: { lat: number; lon: number },
+    to: { lat: number; lon: number },
+    mode: "walk" | "drive",
+  ): Promise<LegTime> {
+    const key = `${mode}:${from.lat.toFixed(5)},${from.lon.toFixed(5)}->${to.lat.toFixed(5)},${to.lon.toFixed(5)}`;
+    const cached = this.directionCache.get(key);
+    if (cached && cached.expires > Date.now()) return { ...cached.value };
+
+    const endpoint =
+      mode === "walk"
+        ? "https://restapi.amap.com/v3/direction/walking"
+        : "https://restapi.amap.com/v3/direction/driving";
+    const url =
+      `${endpoint}?origin=${encodeURIComponent(`${from.lon},${from.lat}`)}` +
+      `&destination=${encodeURIComponent(`${to.lon},${to.lat}`)}` +
+      `&key=${encodeURIComponent(this.key)}`;
+    let data: any;
+    try {
+      data = await getJson(this.fetchImpl, url, this.cfg.timeoutMs);
+    } catch (err) {
+      logUpstreamError("attraction_source_unavailable", err);
+      throw AppError.attractionSourceUnavailable();
+    }
+    if (data?.status !== "1") {
+      logUpstreamError(
+        "attraction_source_unavailable",
+        `direction status=${data?.status} infocode=${data?.infocode}`,
+      );
+      throw AppError.attractionSourceUnavailable();
+    }
+    const path = data?.route?.paths?.[0];
+    const distanceM = Number(path?.distance);
+    const durationS = Number(path?.duration);
+    if (!Number.isFinite(distanceM) || !Number.isFinite(durationS)) {
+      throw AppError.attractionSourceUnavailable();
+    }
+    const value: LegTime = {
+      distanceKm: Math.round((distanceM / 1000) * 10) / 10,
+      durationMin: Math.round(durationS / 60),
+    };
+    this.directionCache.set(key, { value, expires: Date.now() + this.cfg.cacheTtlMs });
+    return value;
   }
 
   private async fetchAttractions(adcode: string): Promise<Attraction[]> {

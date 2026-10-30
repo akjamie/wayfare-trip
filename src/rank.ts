@@ -71,6 +71,7 @@ export function rankForDay(
     id: a.id,
     name_zh: a.nameZh,
     environment: a.environment,
+    category: a.category,
     location: a.location,
     advisories,
     reason: reasonFor(lang, a, opts),

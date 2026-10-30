@@ -30,8 +30,38 @@ describe("route", () => {
         expect(typeof l.distanceKm).toBe("number");
         expect(typeof l.durationMin).toBe("number");
         expect(["walk", "drive"]).toContain(l.mode);
-        if (l.distanceKm <= 2) expect(l.mode).toBe("walk");
-        else expect(l.mode).toBe("drive");
+        const ctx = `leg ${l.from}->${l.to} km=${l.distanceKm} min=${l.durationMin}`;
+        if (l.distanceKm <= 2) expect(l.mode, ctx).toBe("walk");
+        else expect(l.mode, ctx).toBe("drive");
+        // Real travel times from the Amap direction mock:
+        // walking → 0.8 km / 10 min; driving → 12 km / 25 min.
+        if (l.mode === "walk") {
+          expect(l.distanceKm).toBe(0.8);
+          expect(l.durationMin).toBe(10);
+        } else {
+          expect(l.distanceKm).toBe(12);
+          expect(l.durationMin).toBe(25);
+        }
+      }
+    }
+  });
+
+  it("AC10: direction failure falls back to haversine estimates", async () => {
+    const routes = happyRoutes().map((r) =>
+      String(r.match).includes("direction")
+        ? {
+            ...r,
+            respond: () => {
+              throw new Error("direction down");
+            },
+          }
+        : r,
+    );
+    const r = await recommend("Beijing", cfg, makeFetch(routes), 2);
+    for (const d of r.days) {
+      for (const l of d.route.legs) {
+        expect(typeof l.distanceKm).toBe("number");
+        expect(typeof l.durationMin).toBe("number");
         const speed = l.mode === "walk" ? 5 : 30;
         expect(l.durationMin).toBe(Math.round((l.distanceKm / speed) * 60));
       }
@@ -48,7 +78,7 @@ describe("route", () => {
 
   it("AC14: no hotel → route lists stops without hotel endpoints", async () => {
     const routes = routesWithHotel((url) =>
-      url.includes("types=100000") ? { status: "1", count: "0", pois: [] } : poisBody,
+      url.includes("types=100100") ? { status: "1", count: "0", pois: [] } : poisBody,
     );
     const r = await recommend("Beijing", cfg, makeFetch(routes), 2);
     for (const d of r.days) {
@@ -62,7 +92,7 @@ describe("route", () => {
 
   it("AC17: zero stops → empty route with zero totals", async () => {
     const routes = routesWithHotel((url) =>
-      url.includes("types=100000") ? hotelPoisBody : { status: "1", count: "0", pois: [] },
+      url.includes("types=100100") ? hotelPoisBody : { status: "1", count: "0", pois: [] },
     );
     const r = await recommend("Beijing", cfg, makeFetch(routes), 2);
     for (const d of r.days) {
