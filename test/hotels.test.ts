@@ -12,7 +12,7 @@ function hotelEmptyRoutes() {
       ? {
           ...r,
           respond: (url: string) =>
-            url.includes("types=100100") ? { status: "1", count: "0", pois: [] } : poisBody,
+            url.includes("types=110000") === false ? { status: "1", count: "0", pois: [] } : poisBody,
         }
       : r,
   );
@@ -43,7 +43,7 @@ describe("hotels", () => {
         ? {
             ...r,
             respond: (url: string) =>
-              url.includes("types=100100")
+              url.includes("types=110000") === false
                 ? {
                     status: "1",
                     count: "3",
@@ -110,7 +110,7 @@ describe("hotels", () => {
         ? {
             ...r,
             respond: (url: string) =>
-              url.includes("types=100100") ? { status: "0", infocode: "10003" } : poisBody,
+              url.includes("types=110000") === false ? { status: "0", infocode: "10003" } : poisBody,
           }
         : r,
     );

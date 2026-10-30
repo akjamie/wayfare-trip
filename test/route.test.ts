@@ -78,7 +78,7 @@ describe("route", () => {
 
   it("AC14: no hotel → route lists stops without hotel endpoints", async () => {
     const routes = routesWithHotel((url) =>
-      url.includes("types=100100") ? { status: "1", count: "0", pois: [] } : poisBody,
+      url.includes("types=110000") === false ? { status: "1", count: "0", pois: [] } : poisBody,
     );
     const r = await recommend("Beijing", cfg, makeFetch(routes), 2);
     for (const d of r.days) {
@@ -92,7 +92,7 @@ describe("route", () => {
 
   it("AC17: zero stops → empty route with zero totals", async () => {
     const routes = routesWithHotel((url) =>
-      url.includes("types=100100") ? hotelPoisBody : { status: "1", count: "0", pois: [] },
+      url.includes("types=110000") === false ? hotelPoisBody : { status: "1", count: "0", pois: [] },
     );
     const r = await recommend("Beijing", cfg, makeFetch(routes), 2);
     for (const d of r.days) {

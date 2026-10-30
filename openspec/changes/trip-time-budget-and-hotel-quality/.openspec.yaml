@@ -3,7 +3,7 @@ created: 2026-10-24
 requirement: "在现有行程规划基础上改进: (1) 根据景点规模/类型估算游览时长,并按一天的时间预算(含景点间交通)安排每天行程,避免一天塞太多景点或把时间浪费在路上; (2) 酒店推荐只选择真实酒店(排除非酒店住宿POI),优先主流/知名连锁与高星级酒店,按知名度与评分排序,避免冷门或无关结果"
 grillMode: "interactive"
 targetBranch: "main"
-lastPrType: "spec"
-prUrl: "https://github.com/akjamie/wayfare-trip/pull/8"
+lastPrType: "impl"
+prUrl: "https://github.com/akjamie/wayfare-trip/pull/9"
 specSha: ca89c8d9828daba551b25e7509d09957930b2011
 status: ready_for_impl

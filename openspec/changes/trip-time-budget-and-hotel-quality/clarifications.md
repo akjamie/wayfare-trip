@@ -28,6 +28,13 @@
 
 - **Q8 — Tracking** → new change `trip-time-budget-and-hotel-quality`; MODIFY `Trip itinerary`, ADD `Attraction visit duration`, `Time-budgeted daily plan`, `Real travel times`, `Hotel source and selection quality`.
 
+## Live-data refinements (implementation round)
+
+- **Star filter at query level** → `star=N` maps to hotel typecodes in the Amap query itself (5★→`100101|100102`, 4★→+`100103`, 3★→+`100104`); free-tier data rarely tags stars post-hoc, so server-side filtering is the only reliable way. Hotel cache key includes the star.
+- **Hotel ranking refined** → high-star hotels first (unknown level last), then mainstream-brand boost, then rating desc, then Amap relevance, then distance, then id. Fixes “default shows a 破旅馆”.
+- **Clean initial UI** → result sections (Hotels/Trip plan/Daily status/Routes) stay hidden until the first successful search.
+- **API no-store** → API responses send `Cache-Control: no-store` and the client fetches with `cache: "no-store"` (a stale cached plan previously hid new fields such as hotels).
+
 ## Open questions
 <!-- must be empty before the spec is written -->
 (none)

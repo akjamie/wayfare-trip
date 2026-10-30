@@ -157,7 +157,7 @@ export function happyRoutes(weather: unknown = weatherBody(7)): Route[] {
     { match: AMAP_REGEO, respond: () => regeoBody },
     {
       match: AMAP_TEXT,
-      respond: (url) => (url.includes("types=100100") ? hotelPoisBody : poisBody),
+      respond: (url) => (url.includes("types=110000") === false ? hotelPoisBody : poisBody),
     },
     { match: WEATHER, respond: () => weather },
     // Real travel times (Amap direction API)

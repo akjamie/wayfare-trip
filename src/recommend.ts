@@ -163,7 +163,7 @@ export async function recommend(
       }
     : { lat: city.lat, lon: city.lon };
 
-  const hotelPois = await client.hotels(city.adcode);
+  const hotelPois = await client.hotels(city.adcode, filters.star);
   const hotels = filterAndRankHotels(
     hotelPois,
     filters,

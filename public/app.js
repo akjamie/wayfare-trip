@@ -58,6 +58,7 @@ const weatherEl = $("weather");
 const cardsEl = $("cards");
 const itineraryEl = $("itinerary");
 const routesEl = $("routes");
+const resultsEl = $("results");
 const titleEl = $("app-title");
 const subtitleEl = $("app-subtitle");
 const submitEl = $("submit");
@@ -200,12 +201,8 @@ async function run() {
 
   errorEl.hidden = true;
   loadingEl.hidden = false;
+  resultsEl.hidden = true;
   summaryEl.textContent = ui.loading;
-  hotelsEl.innerHTML = "";
-  itineraryEl.innerHTML = "";
-  weatherEl.innerHTML = "";
-  cardsEl.innerHTML = "";
-  routesEl.innerHTML = "";
 
   const params = new URLSearchParams({ city, days, lang });
   if (star) params.set("star", star);
@@ -222,6 +219,7 @@ async function run() {
       summaryEl.textContent = "";
       return;
     }
+    resultsEl.hidden = false;
     render(data);
   } catch {
     loadingEl.hidden = true;
@@ -256,6 +254,8 @@ clearEl.addEventListener("click", () => {
   weatherEl.innerHTML = "";
   cardsEl.innerHTML = "";
   routesEl.innerHTML = "";
+  hotelsEl.innerHTML = "";
+  resultsEl.hidden = true;
 });
 
 langSelect.addEventListener("change", () => {

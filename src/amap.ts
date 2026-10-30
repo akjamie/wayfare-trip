@@ -206,24 +206,39 @@ export class AmapClient {
     return promise;
   }
 
-  /** Hotel POIs for a city (types=100000), cached per adcode. */
-  async hotels(adcode: string): Promise<HotelPoi[]> {
-    const cached = this.hotelCache.get(adcode);
+  /** Hotel POIs for a city, cached per adcode+star. Star maps to hotel typecodes. */
+  async hotels(adcode: string, star?: 3 | 4 | 5): Promise<HotelPoi[]> {
+    const cacheKey = `${adcode}:${star ?? 0}`;
+    const cached = this.hotelCache.get(cacheKey);
     if (cached && cached.expires > Date.now()) return cached.value;
 
-    const existing = this.hotelInflight.get(adcode);
+    const existing = this.hotelInflight.get(cacheKey);
     if (existing) return existing;
 
-    const promise = this.fetchHotels(adcode).finally(() => this.hotelInflight.delete(adcode));
-    this.hotelInflight.set(adcode, promise);
+    const promise = this.fetchHotels(adcode, star).finally(() =>
+      this.hotelInflight.delete(cacheKey),
+    );
+    this.hotelInflight.set(cacheKey, promise);
     return promise;
   }
 
-  private async fetchHotels(adcode: string): Promise<HotelPoi[]> {
+  /**
+   * Star -> hotel typecodes: the Amap query filters by real hotel class, so a
+   * starred request returns actually-starred hotels even when free-tier data
+   * rarely tags them post-hoc.
+   */
+  private hotelTypesForStar(star?: 3 | 4 | 5): string {
+    if (star === 5) return "100101|100102";
+    if (star === 4) return "100101|100102|100103";
+    if (star === 3) return "100101|100102|100103|100104";
+    return this.cfg.hotelTypes; // no filter: all real hotels
+  }
+
+  private async fetchHotels(adcode: string, star?: 3 | 4 | 5): Promise<HotelPoi[]> {
     const url =
       "https://restapi.amap.com/v3/place/text" +
       `?key=${encodeURIComponent(this.key)}` +
-      `&types=${encodeURIComponent(this.cfg.hotelTypes)}&city=${encodeURIComponent(adcode)}&citylimit=true` +
+      `&types=${encodeURIComponent(this.hotelTypesForStar(star))}&city=${encodeURIComponent(adcode)}&citylimit=true` +
       `&offset=25&page=1&extensions=all`;
     let data: any;
     try {
@@ -243,7 +258,8 @@ export class AmapClient {
     const hotels = pois
       .filter((p: any) => p && p.id)
       .map((p: any, i: number) => toHotelPoi(p, i));
-    this.hotelCache.set(adcode, { value: hotels, expires: Date.now() + this.cfg.cacheTtlMs });
+    const cacheKey = `${adcode}:${star ?? 0}`;
+    this.hotelCache.set(cacheKey, { value: hotels, expires: Date.now() + this.cfg.cacheTtlMs });
     return hotels;
   }
 

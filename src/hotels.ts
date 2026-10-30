@@ -58,10 +58,12 @@ export function filterAndRankHotels(
       distance: haversineKm(centroid, { lat: p.lat, lon: p.lon }),
     }))
     .sort((a, b) => {
-      // Amap relevance first (lower relevanceRank = more prominent).
-      if (a.p.relevanceRank !== b.p.relevanceRank) {
-        return a.p.relevanceRank - b.p.relevanceRank;
-      }
+      // High-star hotels first (unknown level last).
+      const sa = a.p.star;
+      const sb = b.p.star;
+      if (sa !== undefined && sb === undefined) return -1;
+      if (sa === undefined && sb !== undefined) return 1;
+      if (sa !== undefined && sb !== undefined && sa !== sb) return sb - sa;
       // Mainstream-brand boost (brand before non-brand).
       if (!!a.brand !== !!b.brand) return a.brand ? -1 : 1;
       // Rating desc, missing last.
@@ -70,7 +72,10 @@ export function filterAndRankHotels(
       if (ra === undefined && rb !== undefined) return 1;
       if (ra !== undefined && rb === undefined) return -1;
       if (ra !== undefined && rb !== undefined && ra !== rb) return rb - ra;
-      // Distance asc, then id asc.
+      // Amap relevance asc, then distance asc, then id asc.
+      if (a.p.relevanceRank !== b.p.relevanceRank) {
+        return a.p.relevanceRank - b.p.relevanceRank;
+      }
       if (a.distance !== b.distance) return a.distance - b.distance;
       return a.p.id < b.p.id ? -1 : a.p.id > b.p.id ? 1 : 0;
     })
