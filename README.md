@@ -99,6 +99,8 @@ See `openspec/config.yaml`, `.sdlc/policy.yaml`, and `AGENTS.md`.
 
 ## Living Specifications
 
+- **`hotel-route-search-redesign`**: The current planner recommends attractions but ignores where travelers stay and how they move between stops. Users also find the top search box clumsy, and there is no way to bias the trip toward a star level or budget. Travelers need a cleaner search, a recommended hotel that respects their star/price preference, and a day-by-day route that connects the hotel and the attractions.
+
 - **`tourism-site-i18n-and-itinerary`**: The first release works but falls short as a product: the page does not look like a tourism site; Chinese and pinyin city input resolve incorrectly (`西安` fails, `Xian` returns Zhuhai/长隆); output is English-only; and a result is just a flat attraction list with no reasons, no descriptions, and no trip plan. Travelers need a presentable, bilingual page that actually plans a visit.
 
 - **`city-attractions-weather-recommendations`**: Travelers picking a Chinese city need to know which attractions are worth visiting *and* how the upcoming weather should change those plans. Today there is no tool that answers both at once; weather apps show forecasts but no attraction guidance, and attraction lists ignore the forecast. We build a website that takes a Chinese city name and returns per-day attraction recommendations shaped by the forecast, with English as the default system output.
